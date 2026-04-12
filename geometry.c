@@ -2,6 +2,30 @@
 #include "cvec.h"
 #include "primitives.h"
 
+Uint32 hash_style( Style* style ){
+    //FNV-1a style hash
+    Uint32 h = 2166136261u;
+    
+    h = (h ^ (style->stroke ? 1 : 0)) * 16777619u;
+    h = (h ^ style->stroke_color.r) * 16777619u;
+    h = (h ^ style->stroke_color.g) * 16777619u;
+    h = (h ^ style->stroke_color.b) * 16777619u;
+    h = (h ^ style->stroke_color.a) * 16777619u;
+    
+    union { float f; Uint32 u; } converter;
+    converter.f = style->stroke_width;
+    h = (h ^ converter.u) * 16777619u;
+    
+    h = (h ^ (style->fill ? 1 : 0)) * 16777619u;
+    h = (h ^ style->fill_color.r) * 16777619u;
+    h = (h ^ style->fill_color.g) * 16777619u;
+    h = (h ^ style->fill_color.b) * 16777619u;
+    h = (h ^ style->fill_color.a) * 16777619u;
+    
+    return h;
+}
+
+
 // based on an algorithm in Andre LeMothe's "Tricks of the Windows Game Programming Gurus"
 // Returns 1 if the lines intersect, otherwise 0. In addition, if the lines 
 // intersect the intersection point may be stored in the floats ix and iy.
@@ -219,6 +243,18 @@ vec2d Path_centroid( Path *p ){
 	return c;
 }
 
+Circle circumscribe_Path( Path *p ){
+	Circle c = {0};
+	c.pos = Path_centroid( p );
+	double max_dist = 0;
+	for (int i = 0; i < p->N; ++i){
+		double d = v2d_distsq( c.pos, p->verts[i] );
+		if( d > max_dist ) max_dist = d;
+	}
+	c.radius = SDL_sqrtf( max_dist );
+	return c;
+}
+
 
 vec2d geo_centroid( Geometric *geo ){
 	switch (geo->type) {
@@ -401,8 +437,8 @@ void draw_TGeo( SDL_Renderer *R, Geometric *geo, Transform *T, SDL_FPoint *vbuf 
 }
 
 void draw_Styled_TGeo( SDL_Renderer *R, Styled_Geo *sg, Transform *T, SDL_FPoint *vbuf ){
-	if( sg->style.stroke ){
-		SDL_SetRenderDraw_SDL_Color( R, sg->style.stroke_color );
+	if( sg->style->stroke ){
+		SDL_SetRenderDraw_SDL_Color( R, sg->style->stroke_color );
 		draw_TGeo( R, &(sg->geo), T, vbuf );
 	}
 }
@@ -411,16 +447,16 @@ void draw_Styled_TGeo_vec( SDL_Renderer *R, Styled_Geo *sgv, Transform *T, SDL_F
 	int N = vec_size( sgv );
 	for (int i = 0; i < N; ++i ){
 		//draw_Styled_TGeo( R, sgv + i, T, vbuf );
-		if( sgv[i].style.stroke ){
-			SDL_SetRenderDraw_SDL_Color( R, sgv[i].style.stroke_color );
+		if( sgv[i].style->stroke ){
+			SDL_SetRenderDraw_SDL_Color( R, sgv[i].style->stroke_color );
 			draw_TGeo( R, &(sgv[i].geo), T, vbuf );
 		}
 	}
 }
 
 void draw_Styled_RTGeo( SDL_Renderer *R, Styled_Geo *sg, vec2d trig, Transform *T, SDL_FPoint *vbuf ){
-	if( sg->style.stroke ){
-		SDL_SetRenderDraw_SDL_Color( R, sg->style.stroke_color );
+	if( sg->style->stroke ){
+		SDL_SetRenderDraw_SDL_Color( R, sg->style->stroke_color );
 		switch( sg->geo.type ){
 			case geo_PATH:;
 				int c = sg->geo.u.path.N;
@@ -514,7 +550,24 @@ int* parse_dope_sheet( const char *s ){
     return DS;
 }
 
+void draw_Geo_Animation( SDL_Renderer *R, Geo_Animation *A, int *current_frame, int *timer,
+                         Transform *T, SDL_FPoint *vbuf ){
 
+	int f = 2 + (*current_frame) * A->dope_sheet[1];
+	for (int ci = 1; ci <= A->dope_sheet[f]; ++ci ){
+		int c = A->dope_sheet[f + ci];
+		draw_Styled_TGeo( R, A->cells + c, T, vbuf );
+	}
+
+	*timer += 1;
+	if( *timer >= A->period ){
+		*timer = 0;
+		*current_frame += 1;
+		if( *current_frame >= A->dope_sheet[0] ){
+			*current_frame = 0;
+		}
+	}
+}
 
 
 
@@ -589,6 +642,6 @@ void log_styled_geo_array( const Styled_Geo* arr, int N, const char* name ){
 	for (int i = 0; i < N; i++) {
 		SDL_Log("  %s[%d]:", name, i);
 		log_geometric(&arr[i].geo, i);
-		log_style(&arr[i].style);
+		log_style(arr[i].style);
 	}
 }

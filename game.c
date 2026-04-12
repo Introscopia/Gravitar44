@@ -3,6 +3,17 @@
 #include "cvec.h"
 #include "ok_lib.h"
 
+
+static void new_hashmap( Hashmap *m, int o, int n, ...){
+	ok_map_init_with_capacity( m, n );
+	va_list vl;
+	va_start(vl,n);
+	for (int i = 0; i < n; i++){
+		ok_map_put( m, va_arg( vl, const char* ), i+o );
+	}
+	va_end(vl);
+}
+
 void load_doodads( char *filename, Library *lib ){
 
 	SDL_Log("loading doodads from \"%s\"", filename );
@@ -11,362 +22,206 @@ void load_doodads( char *filename, Library *lib ){
 	if( f == NULL ){
 		SDL_Log( "failed to open \"%s\"", filename );
 		return;
-	} //else SDL_Log( "file opened successfully" );
+	}
 	SVG_Layer *L = svg_load_layer( f, "Layer 1" );
 	if( L == NULL ){
 		SDL_Log( "failed to load \"Layer 1\"" );
 		return;
 	}
+	SDL_CloseIO( f );
 
-	SDL_memset( lib, 0, sizeof(Library) );
+	int class_id = -1;
+	for (int t = 0; t < vec_size( L->tags ); ++t ){
+		if( SDL_strcmp( L->tags[t], "class" ) == 0 ){
+			class_id = t;
+			break;
+		}
+	}
+	if( class_id < 0 ){
+		SDL_Log( "nothing in this layer contains a \"class\" attribute." );
+		return;
+	}
 
-	struct {
-		char *name;
-		int *Es;
-		char **prop;
-		int *index;
-		int N;
-	} *doods;
 	int doods_N = 0;
-	doods = NULL;
 
-	Hashmap dood_map;
-	ok_map_init( &dood_map );
-
-	int reserved_ids_N = 1;
-	char reserved_ids [][32] = { "smokepuffs" };
-	int reserved_dtype [] =    {  PARTICULARS+1 };
-	Hashmap reserved_id_map;
-	ok_map_init_with_capacity( &reserved_id_map, reserved_ids_N );
-	for (int r = 0; r < reserved_ids_N; ++r ){
-		ok_map_put( &reserved_id_map, reserved_ids[r], r+1 );
-	}
-
-	//SDL_Log( "now let's find and associate...");	
-
-	// find and associate sets of svg elements together into "doods"
-	for (int e = 0; e < vec_size(L->E); ++e ){
-		//SDL_Log( "looking at \"%s\"", L->E[e].id );
-		char* colon = SDL_strchr( L->E[e].id, ':' );
-		if (colon != NULL) {
-			*colon = '\0';
-			int D = ok_map_get( &dood_map, L->E[e].id ) -1;
-			if( D < 0 ){
-				D = doods_N;
-				doods_N += 1;
-				doods = SDL_realloc( doods, doods_N * sizeof(*doods) );
-				SDL_memset( doods+D, 0, sizeof(*doods) );
-				doods[D].name = SDL_strdup( L->E[e].id );
-				ok_map_put( &dood_map, doods[D].name, D+1 );
-			}
-			int p = doods[D].N;
-			doods[D].N += 1;
-
-			doods[D].Es = SDL_realloc( doods[D].Es, doods[D].N * sizeof(int) );
-			doods[D].Es[p] = e;
-
-			doods[D].prop = SDL_realloc( doods[D].prop, doods[D].N * sizeof(char*) );
-			doods[D].prop[p] = SDL_strdup( colon+1 );
-
-			char* dash = SDL_strchr( colon+1, '-' );
-			if( dash != NULL ){
-				*dash = '\0';
-				doods[D].index = SDL_realloc( doods[D].index, doods[D].N * sizeof(int) );
-				doods[D].index[p] = SDL_strtol( dash+1, NULL, 10 );
-			}
-		}
-		else{
-			char* dash = SDL_strchr( L->E[e].id, '-' );
-			if( dash != NULL ){
-				*dash = '\0';
-			}
-			int RN = ok_map_get( &reserved_id_map, L->E[e].id )-1;
-
-			if( RN >= 0 ){
-				int D = ok_map_get( &dood_map, reserved_ids[RN] ) -1;
-				if( D < 0 ){
-					D = doods_N;
-					doods_N += 1;
-					doods = SDL_realloc( doods, doods_N * sizeof(*doods) );
-					SDL_memset( doods+D, 0, sizeof(*doods) );
-					doods[D].name = SDL_strdup( reserved_ids[RN] );
-					ok_map_put( &dood_map, doods[D].name, D+1 );
-				}
-				int p = doods[D].N;
-				doods[D].N += 1;
-				doods[D].Es = SDL_realloc( doods[D].Es, doods[D].N * sizeof(int) );
-				doods[D].Es[p] = e;
-				doods[D].prop = SDL_realloc( doods[D].prop, doods[D].N * sizeof(char*) );
-				doods[D].prop[p] = SDL_strdup( "none" );
-				if( dash != NULL ){
-					doods[D].index = SDL_realloc( doods[D].index, doods[D].N * sizeof(int) );
-					doods[D].index[p] = SDL_strtol( dash+1, NULL, 10 );
-				} else {
-					doods[D].index = SDL_realloc( doods[D].index, doods[D].N * sizeof(int) );
-					doods[D].index[p] = D;
-				}
-			}
-			else{
-				//SDL_Log( "unreccd doodad: {%s}", L->E[e].id );
+	// how many elements in this layer have a "class" attribute
+	int Es = vec_size(L->E);
+	for (int e = 0; e < Es; ++e ){
+		int ms = vec_size( L->E[e].metadata );
+		for (int m = 0; m < ms; ++m ){
+			if( L->E[e].metadata[m].tag_index == class_id ){
+				doods_N++;
 			}
 		}
 	}
 
-	SDL_Log( "found and associated %d elements into %d doods.", vec_size(L->E), doods_N );
-
+	SDL_Log( "Found %d doods", doods_N );
+	SDL_memset( lib, 0, sizeof(Library) );
 	vec_init( lib->doodads, doods_N );
 	int D = 0;
+	// hand over styles library
+	lib->styles = L->styles;
+	L->styles = NULL;
 
 	Hashmap class_map;
-	ok_map_init_with_capacity( &class_map, 3 );
-	ok_map_put( &class_map, "ship", SHIP+1 );
-	ok_map_put( &class_map, "bomb", BOMB+1 );
-	ok_map_put( &class_map, "item", ITEM+1 );
+	new_hashmap( &class_map, 2, 3, "ship", "bomb", "item" );
+	Hashmap doodelements_map;//                0         1        2        3        4
+	new_hashmap( &doodelements_map, 1, 5, "physical", "visual", "exhaust", "center", "smoke" );
+	Hashmap ship_attribs_map;
+	new_hashmap( &ship_attribs_map, 1, 5, "thrust", "turn_speed", "hull_max", "fuel_max", "fuel_consumption" );
 
-	//                              0         1        2        3        4
-	char prop_names [][32] = { "physical", "visual", "exh", "center", "smoke" };
-	int prop_names_N = 5;
 
-	int *prop_name_len = SDL_malloc( prop_names_N * sizeof(int) );
-	for (int p = 0; p < prop_names_N; ++p ){
-		prop_name_len[p] = SDL_strlen( prop_names[p] );
-	}
+	for (int e = 0; e < Es; ++e ){
 
-	int **prop_de = SDL_calloc( prop_names_N, sizeof(int*) );
-
-	char ship_attribs [][32] = { "thrust", "turn_speed", "hull_max", "fuel_max", "fuel_consumption" };
-	Hashmap ship_attrib_map;
-	ok_map_init_with_capacity( &ship_attrib_map, 5 );
-	for (int a = 0; a < 5; ++a ){
-		ok_map_put( &ship_attrib_map, ship_attribs[a], a+1 );
-	}
-
-	// now that we know what things are, extract the data.
-	for (int d = 0; d < doods_N; ++d ){
-		SDL_Log( "extracing dood %d", d );
-
-		for (int p = 0; p < prop_names_N; ++p ){
-			if( vec_size(prop_de[p]) > 0 ) vec_shrinkto(prop_de[p],0);
+		int C = -1;
+		int ms = vec_size( L->E[e].metadata );
+		for (int m = 0; m < ms; ++m ){
+			if( L->E[e].metadata[m].tag_index == class_id ){ //SDL_strncmp( L->tags[t], "class", 5 ) == 0
+				C = ok_map_get( &class_map, L->E[e].metadata[m].data )-1;
+				if( C < 0 ) SDL_Log( "unreccd class: <%s>", L->E[e].metadata[m].data );
+				break;
+			}
 		}
+		if( C >= 0 ){
+			lib->doodads[D].type = C;
 
-		for (int de = 0; de < doods[d].N; ++de ){ // for each of this dood's associated svg elements
-			int ed = doods[d].Es[de];
+			switch( C ){
+				case SHIP:{
 
-			for (int p = 0; p < prop_names_N; ++p ){
-				
-				if( SDL_strncmp( doods[d].prop[de], prop_names[p], prop_name_len[p] ) == 0 ){
+					SDL_Log("shippin'");
 
-					vec_push( prop_de[p], de );
-					
-					for (int m = 0; m < vec_size(L->E[ed].metadata); ++m ){
-						int t = L->E[ed].metadata[m].tag_index;
-						if( SDL_strncmp( L->tags[t], "class", 5 ) == 0 ){
+					if( L->E[e].type != SVG_GROUP ){
+						SDL_Log( "how you gon make a ship and it's not a group!? (%s)", L->E[e].id );
+					}
 
-							int C = ok_map_get( &class_map, L->E[ed].metadata[m].data )-1;
-
-							if( C >= 0 ){
-								lib->doodads[D].type = C;
-							}							
-							else{
-								SDL_Log( "class: {%s}....", L->E[ed].metadata[m].data ); 
-							}
-							break;
+					int gs = vec_size( L->E[e].u.group );
+					int doodelements [5];
+					for (int g = 0; g < gs; ++g ){
+						char *des = sseek_char( L->E[e].u.group[g].id, ':' );
+						int de = ok_map_get( &doodelements_map, des )-1;
+						if( de >= 0 && de < 5 ){
+							doodelements[de] = g;
+						}
+						else{
+							SDL_Log( "element is not a recognized doodelement: \"%s\"", L->E[e].u.group[g].id );
 						}
 					}
-					break;
-				}
-			}
-		}
-		if( lib->doodads[D].type == EMPTY ){
 
-			//int reserved_ids_N = ok_map_count(&reserved_ids);
-			int RN = ok_map_get( &reserved_id_map, doods[d].name )-1;
+					SDL_strlcpy( lib->doodads[D].name, L->E[e].id, 64 );
 
-			if( RN >= 0 ){
-				lib->doodads[D].type = reserved_dtype[ RN ];
-			}
-		}
-		if( lib->doodads[D].type == EMPTY ){
-			SDL_Log( "can't identify the class of doodad {%s}", doods[d].name );
-			continue;
-		}
-
-		switch( lib->doodads[D].type ){
-			case SHIP:
-
-				SDL_strlcpy( lib->doodads[D].u.ship.name, doods[d].name, 64 );
-
-				// CENTER : PROP 3
-				vec2d offset = v2dzero;
-				if( vec_size( prop_de[3] ) >= 1 ){
-					int ed = doods[d].Es[ prop_de[3][0] ];
-					offset =  v2d_neg( L->E[ed].u.geo.u.circle.pos );
-				}
-				// PHYSICAL : PROP 0
-				//lib->doodads[D].u.ship.physical_N = vec_size( prop_de[0] );
-				int N = vec_size( prop_de[0] );
-				vec_init( lib->doodads[D].u.ship.physical, N );
-				vec_init( lib->doodads[D].u.ship.properties, N );
-				for (int p = 0; p < N; ++p ){
-					int de = prop_de[0][p];
-					int ed = doods[d].Es[de];
-					lib->doodads[D].u.ship.physical[p] = L->E[ed].u.geo;
-					if( L->E[ed].u.geo.type == geo_PATH ) L->E[ed].u.geo.u.path.N = 0;// to prevent verts getting freed later
-					geo_offset( lib->doodads[D].u.ship.physical + p, offset );
-
-					cpProperties pr = retrieve_cpProperties_from_SVG_metadata( L->E + ed, L->tags, NULL, NULL );
-					lib->doodads[D].u.ship.properties[p] = pr;
-				}
-				// VISUAL : PROP 1
-				N = vec_size( prop_de[1] );
-				vec_init( lib->doodads[D].u.ship.visual, vec_size( prop_de[1] ) );// = SDL_calloc( lib->doodads[D].u.ship.visual_N, sizeof(Styled_Geo) );
-				for (int v = 0; v < N; ++v ){
-					int de = prop_de[1][v];
-					int ed = doods[d].Es[de];
-					lib->doodads[D].u.ship.visual[v].geo = L->E[ed].u.geo;
-					if( L->E[ed].u.geo.type == geo_PATH ){
-						if( L->E[ed].u.geo.u.path.N > lib->longest_path ) lib->longest_path = L->E[ed].u.geo.u.path.N;
-						L->E[ed].u.geo.u.path.N = 0;// to prevent verts getting freed later
-					}
-					geo_offset( &(lib->doodads[D].u.ship.visual[v].geo), offset );
-					lib->doodads[D].u.ship.visual[v].style = *(L->E[ed].style);
-				}
-				// EXH : PROP 2
-				N = vec_size( prop_de[2] );
-				vec_init( lib->doodads[D].u.ship.exhaust, vec_size( prop_de[2] ) );// = SDL_calloc( lib->doodads[D].u.ship.exhaust_N, sizeof(Styled_Geo) );
-				for (int x = 0; x < N; ++x ){
-					int de = prop_de[2][x];
-					int ed = doods[d].Es[de];
-					lib->doodads[D].u.ship.exhaust[x].geo = L->E[ed].u.geo;
-					if( L->E[ed].u.geo.type == geo_PATH ){
-						if( L->E[ed].u.geo.u.path.N > lib->longest_path ) lib->longest_path = L->E[ed].u.geo.u.path.N;
-						L->E[ed].u.geo.u.path.N = 0;// to prevent verts getting freed later
-					}
-					geo_offset( &(lib->doodads[D].u.ship.exhaust[x].geo), offset );
-					lib->doodads[D].u.ship.exhaust[x].style = *(L->E[ed].style);
-				}
-				// SMOKE : PROP 4
-				if( vec_size( prop_de[4] ) >= 1 ){
-					int ed = doods[d].Es[ prop_de[4][0] ];
-					lib->doodads[D].u.ship.smoke_outlet = v2d_to_cpv(v2d_sum( L->E[ed].u.geo.u.circle.pos, offset ));
-					//lib->doodads[D].u.ship.smoke_outlet = cpvneg( lib->doodads[D].u.ship.smoke_outlet );
-					//SDL_Log( "lib->doodads[D].u.ship.smoke_outlet: %lg, %lg", lib->doodads[D].u.ship.smoke_outlet.x, lib->doodads[D].u.ship.smoke_outlet.y );
-				}
-
-				for (int de = 0; de < doods[d].N; ++de ){ // for each of this dood's associated svg elements
-					int ed = doods[d].Es[de];
-					for (int m = 0; m < vec_size(L->E[ed].metadata); ++m ){
-						int t = L->E[ed].metadata[m].tag_index;
-						int A = ok_map_get( &ship_attrib_map, L->tags[t] )-1;
+					for (int m = 0; m < ms; ++m ){
+						int t = L->E[e].metadata[m].tag_index;
+						int A = ok_map_get( &ship_attribs_map, L->tags[t] )-1;
 						switch( A ){
 							case 0: // "thrust"
-								lib->doodads[D].u.ship.thrust = SDL_atof( L->E[ed].metadata[m].data );
+								lib->doodads[D].u.ship.thrust = SDL_atof( L->E[e].metadata[m].data );
 								break;
 							case 1:// "turn_speed"
-								lib->doodads[D].u.ship.turn_speed = SDL_atof( L->E[ed].metadata[m].data );
+								lib->doodads[D].u.ship.turn_speed = SDL_atof( L->E[e].metadata[m].data );
 								break;
 							case 2:// "hull_max"
-								lib->doodads[D].u.ship.hull_max = SDL_atof( L->E[ed].metadata[m].data );
+								lib->doodads[D].u.ship.hull_max = SDL_atof( L->E[e].metadata[m].data );
 								break;
 							case 3:// "fuel_max"
-								lib->doodads[D].u.ship.fuel_max = SDL_atof( L->E[ed].metadata[m].data );
+								lib->doodads[D].u.ship.fuel_max = SDL_atof( L->E[e].metadata[m].data );
 								break;
 							case 4:// "fuel_consumption"
-								lib->doodads[D].u.ship.fuel_consumption = SDL_atof( L->E[ed].metadata[m].data );
+								lib->doodads[D].u.ship.fuel_consumption = SDL_atof( L->E[e].metadata[m].data );
 								break;
 						}
 					}
-				}
 
-				break;
-
-			/*case SMOKE:
-
-				vec_init( lib->doodads[D].u.visuals, doods[d].N );
-				for (int e = 0; e < doods[d].N; ++e ){
-					int ed = doods[d].Es[e];
-					vec_init( lib->doodads[D].u.visuals[e], 1 );
-					lib->doodads[D].u.visuals[e][0].geo = L->E[ed].u.geo;
-					if( L->E[ed].u.geo.type == geo_PATH ){
-						if( L->E[ed].u.geo.u.path.N > lib->longest_path ) lib->longest_path = L->E[ed].u.geo.u.path.N;
-						L->E[ed].u.geo.u.path.N = 0;// to prevent verts getting freed later
-					}
-					lib->doodads[D].u.visuals[e][0].style = *(L->E[ed].style);
-					geo_centralize( &(lib->doodads[D].u.visuals[e][0].geo) );
-				}
-				lib->smokepuffs = D;
-
-				break;*/
-
-			case BOMB:
-
-				break;
-
-			case ITEM:
-
-				break;
-
-			case PARTICULARS:;
-				/*
-				int P = lib->doodads[D].type - PARTICULARS;
-				switch( P ){
-
-					case 1: //smokepuffs
-
-						for (int de = 0; de < doods[d].N; ++de ){ // for each of this dood's associated svg elements
-							int ed = doods[d].Es[de];
-							for (int m = 0; m < L->E[ed].metadata_count; ++m ){
-								int t = L->E[ed].metadata[m].tag_index;
-								if( SDL_strcmp( L->tags[t], "path", 5 ) == 0 ){
-									lib->puffs = IMG_LoadTexture( R, L->E[ed].metadata[m].data );
-								}
-								else if( SDL_strcmp( L->tags[t], "dimensions" ) == 0 ){
-									if (SDL_sscanf(str, "%d,%d,%d,%d", &(lib->puff_dims.x), &(lib->puff_dims.y), 
-										                               &(lib->puff_dims.w), &(lib->puff_dims.h)) != 4) {
-										SDL_Log( "hmm... uhhh" );
-									}
-								}
-							}
+					// CENTER : ELEMENT 3
+					vec2d offset = v2dzero;
+					if( doodelements[3] >= 0 ){
+						SVG_Element *CE = L->E[e].u.group + doodelements[3];
+						if( CE->type != SVG_GEO || CE->u.geo.type != geo_CIRCLE ){
+							SDL_Log( "that's not how you do a doodad's center! (%s)", CE->id );
 						}
+						offset = v2d_neg( CE->u.geo.u.circle.pos );
+					}
 
-						break;
-				}
-				*/
+					// PHYSICAL : ELEMENT 0
+					SVG_Element *PE = L->E[e].u.group + doodelements[0];
+					if( PE->type == SVG_GROUP ){
+						int N = vec_size( PE->u.group );
+						vec_init( lib->doodads[D].u.ship.physical, N );
+						vec_init( lib->doodads[D].u.ship.properties, N );
+						for (int p = 0; p < N; ++p ){
+							lib->doodads[D].u.ship.physical[p] = PE->u.group[p].u.geo;
+							if( PE->u.group[p].u.geo.type == geo_PATH ) PE->u.group[p].u.geo.u.path.N = 0;// take ownership away from layer
+							geo_offset( lib->doodads[D].u.ship.physical + p, offset );
 
-				D--;// don't advance the doodads
-				break;
+							cpProperties pr = retrieve_cpProperties_from_SVG_metadata( PE->u.group + p, L->tags, NULL, NULL );
+							lib->doodads[D].u.ship.properties[p] = pr;
+						}
+					}
+					else{// just one
+						vec_init( lib->doodads[D].u.ship.physical, 1 );
+						vec_init( lib->doodads[D].u.ship.properties, 1 );
+						lib->doodads[D].u.ship.physical[0] = PE->u.geo;
+						if( PE->u.geo.type == geo_PATH ) PE->u.geo.u.path.N = 0;// take ownership away from layer
+						geo_offset( lib->doodads[D].u.ship.physical + 0, offset );
+						cpProperties pr = retrieve_cpProperties_from_SVG_metadata( PE, L->tags, NULL, NULL );
+						lib->doodads[D].u.ship.properties[0] = pr;
+					}
+
+					//~~~~~I am here
+					
+					// VISUAL : ELEMENT 1
+					SVG_Element *VE = L->E[e].u.group + doodelements[1];
+					if( VE->type == SVG_GROUP ){
+						int N = vec_size( VE->u.group );
+						vec_init( lib->doodads[D].u.ship.visual, N );
+						for (int v = 0; v < N; ++v ){
+							lib->doodads[D].u.ship.visual[v].geo = VE->u.group[v].u.geo;
+							if( VE->u.group[v].u.geo.type == geo_PATH ){
+								if( VE->u.group[v].u.geo.u.path.N > lib->longest_path ) lib->longest_path = VE->u.group[v].u.geo.u.path.N;
+								VE->u.group[v].u.geo.u.path.N = 0;// take ownership away from layer
+							}
+							geo_offset( &(lib->doodads[D].u.ship.visual[v].geo), offset );
+
+							lib->doodads[D].u.ship.visual[v].style = VE->u.group[v].style;
+						}
+					}
+					else{// just one
+						vec_init( lib->doodads[D].u.ship.visual, 1 );
+						lib->doodads[D].u.ship.visual[0].geo = VE->u.geo;
+						if( VE->u.geo.type == geo_PATH ){
+							if( VE->u.geo.u.path.N > lib->longest_path ) lib->longest_path = VE->u.geo.u.path.N;
+							VE->u.geo.u.path.N = 0;// take ownership away from layer
+						}
+						geo_offset( &(lib->doodads[D].u.ship.visual[0].geo), offset );
+
+						lib->doodads[D].u.ship.visual[0].style = VE->style;
+					}
+
+					// EXH : ELEMENT 2
+					SVG_Element *EE = L->E[e].u.group + doodelements[2];
+					lib->doodads[D].u.ship.exhaust = SVG_Element_to_Geo_Animation( L, EE );
+					int exhN = 1;
+					if( EE->type == SVG_GROUP ) exhN = vec_size( EE->u.group );
+					for (int e = 0; e < exhN; ++e ){
+						geo_offset( &(lib->doodads[D].u.ship.exhaust.cells[e].geo), offset );
+					}
+
+					// SMOKE : ELEMENT 4
+					SVG_Element *SE = L->E[e].u.group + doodelements[4];
+					if( doodelements[4] >= 0 && SE->type == SVG_GEO && SE->u.geo.type == geo_CIRCLE ){
+						lib->doodads[D].u.ship.smoke_outlet = v2d_to_cpv(v2d_sum( SE->u.geo.u.circle.pos, offset ));
+					}
+					//else SDL_Log("Bad smoke!");
+					} break;
+			}
+
+			D++;
 		}
-
-		D++;
 	}
-	SDL_Log("Done!");
 
-	vec_shrinkto( lib->doodads, D );
-	/*
-	if( D < *doodad_N ){
-		*doodad_N = D;
-		lib->doodads = SDL_realloc( lib->doodads, D * sizeof(Doodad) );
-	}*/
 
-	for (int p = 0; p < prop_names_N; ++p ){
-		vec_free( prop_de[p] );
-	}
-	SDL_free( prop_de );
-	SDL_free( prop_name_len );
-	ok_map_deinit( &dood_map );
-
-	for (int i = 0; i < doods_N; ++i) {
-		SDL_free(doods[i].name);
-		SDL_free(doods[i].Es);
-		for (int j = 0; j < doods[i].N; ++j) {
-			SDL_free(doods[i].prop[j]);
-		}
-		SDL_free(doods[i].prop);
-		SDL_free(doods[i].index);
-	}
-	SDL_free(doods);
-
-	SDL_CloseIO( f );
+	ok_map_deinit( &class_map );
+	ok_map_deinit( &doodelements_map );
+	ok_map_deinit( &ship_attribs_map );
 	SVG_Layer_destroy( L );
 }
 
@@ -378,7 +233,7 @@ void log_ship_data(const Ship_data* ship) {
 	}
 	
 	SDL_Log("=== Ship_data ===");
-	SDL_Log("name: %s", ship->name);
+	//SDL_Log("name: %s", ship->name);
 	SDL_Log("thrust: %.2f", ship->thrust);
 	SDL_Log("turn_speed: %.2f", ship->turn_speed);
 	SDL_Log("smoke_outlet: %lg, %lg", ship->smoke_outlet.x, ship->smoke_outlet.y);
@@ -393,36 +248,39 @@ void log_ship_data(const Ship_data* ship) {
 	log_styled_geo_array(ship->visual, vec_size( ship->visual ), "visual");
 	
 	// log exhaust styled geometries
-	log_styled_geo_array(ship->exhaust, vec_size( ship->exhaust ), "exhaust");
+	SDL_Log( "ship->exhaust: %d frames, period: %d (in 60fps frames)", ship->exhaust.dope_sheet[0], ship->exhaust.period );
 }
 
 
-Ship_inst *instantiate_ship( Ship_data *data, cpSpace *space, cpVect pos ){
+Ship_inst *instantiate_ship( Ship_data *data ){
 
 	Ship_inst *ship = SDL_calloc( 1, sizeof(Ship_inst) );
-	ship->data = data;
+	ship->data = data;	
+	ship->fuel = data->fuel_max;
+	ship->hull = data->hull_max;
+	return ship;
+}
+
+
+void init_ship_physics( Ship_inst *ship, cpSpace *space, cpVect pos ){
 	ship->body = cpSpaceAddBody( space, cpBodyNew(0, 0) );
 	cpBodySetPosition( ship->body, pos );
 
-	int pN = vec_size( data->physical );
+	int pN = vec_size( ship->data->physical );
 	for (int p = 0; p < pN; ++p ){
 
-		cpShape *shape = Geometric_to_cpShape( data->physical + p, ship->body, 0.0 );
+		cpShape *shape = Geometric_to_cpShape( ship->data->physical + p, ship->body, 0.0 );
 		cpSpaceAddShape( space, shape );
-		cpShapeSetDensity( shape, data->properties[p].density );
-		cpShapeSetFriction( shape, data->properties[p].friction );
-		cpShapeSetElasticity( shape, data->properties[p].elasticity );
+		cpShapeSetDensity( shape, ship->data->properties[p].density );
+		cpShapeSetFriction( shape, ship->data->properties[p].friction );
+		cpShapeSetElasticity( shape, ship->data->properties[p].elasticity );
 		cpShapeFilter filter = cpShapeFilterNew( 0, de_mask( "v" ), de_mask( "vs" ) );
 		cpShapeSetFilter( shape, filter );
 	}
-	
-	ship->fuel = data->fuel_max;
-
-	SDL_Log( "ship mass: %g", cpBodyGetMass( ship->body ) );
+	/*SDL_Log( "ship mass: %g", cpBodyGetMass( ship->body ) );
 	cpVect cog = cpBodyGetCenterOfGravity( ship->body );
 	SDL_Log( "cog: %lg, %lg", cog.x, cog.y );
-
-	return ship;
+	*/
 }
 
 
@@ -581,8 +439,8 @@ void render_flat_world( SDL_Renderer *R, void *W, Styled_Geo *map_visuals, Trans
 		for (int e = 0; e < vec_size( fw->chunks[ac] ); ++e ){
 			int me = fw->chunks[ac][e];
 			Styled_Geo *sg = map_visuals + me;
-			if( fw->deja_rendu[me] != uni && sg->style.stroke ){
-				SDL_SetRenderDraw_SDL_Color( R, sg->style.stroke_color );
+			if( fw->deja_rendu[me] != uni && sg->style->stroke ){
+				SDL_SetRenderDraw_SDL_Color( R, sg->style->stroke_color );
 				draw_TGeo( R, &(sg->geo), T, vbuf );
 				fw->deja_rendu[me] = uni;
 			}
@@ -695,6 +553,8 @@ void upon_a_sphere( SDL_Renderer *R, GameState *GS, char *spherepath ){
 	SVG_Layer_to_Styled_Geo_vec( VL, &map_visuals );
 	SVG_Layer_destroy( VL );
 
+	cpVect spawn = cpvzero;
+
 	//SDL_Log( "done.\n now loading Zones layer" );
 	SVG_Layer *ZL = svg_load_layer( f, "Zones" );
 	
@@ -710,6 +570,7 @@ void upon_a_sphere( SDL_Renderer *R, GameState *GS, char *spherepath ){
 				camera_matrix = update_TM_object_rotated;
 				destroy_world = destroy_flat_world;
 				min_scaleI = logarithm( 1.1, GS->width / ZL->E[z].u.geo.u.box.w );
+				spawn = cpv( randomF(0, ZL->E[z].u.geo.u.box.w), ZL->E[z].u.geo.u.box.y );
 			}
 			else if( ZL->E[z].u.geo.type == geo_CIRCLE ){
 				camera_matrix = update_TM_combined;
@@ -735,7 +596,8 @@ void upon_a_sphere( SDL_Renderer *R, GameState *GS, char *spherepath ){
 	int ships_N = 1;
 	Ship_inst **ships = SDL_malloc( ships_N * sizeof(Ship_inst*) );
 
-	ships[0] = instantiate_ship( GS->landing_modules[ GS->active_module ], space, cpv(480,-100) );
+	ships[0] = GS->hero_ship;
+	init_ship_physics( ships[0], space, spawn );
 
 	//SDL_Log( "puffs: %p, puff_dims.h: %d", GS->lib.puffs, GS->lib.puff_dims.h );
 
@@ -901,12 +763,10 @@ void upon_a_sphere( SDL_Renderer *R, GameState *GS, char *spherepath ){
 			if( ships[s]->thrusting ){
 
 				/* Draw exhaust visuals */
-				int f = ships[s]->exh_frame / exh_frame_cycle;
-				draw_Styled_TGeo( R, ships[s]->data->exhaust + f, &T, vbuf );
-				ships[s]->exh_frame += 1;
-				if( ships[s]->exh_frame >= vec_size(ships[s]->data->exhaust) * exh_frame_cycle ){
-					ships[s]->exh_frame = 0;
-				}
+				draw_Geo_Animation( R, &(ships[s]->data->exhaust), 
+				                    &(ships[s]->exh_frame), 
+				                    &(ships[s]->exh_timer),
+                         		    &T, vbuf );
 				/* Create smoke */
 				OBJ *slot = fresh_OBJ_slot( &PUFFOBJS );
 				cpVect svel = cpvmult( cpBodyGetVelocity( ships[s]->body ), 0.5 );
@@ -973,16 +833,6 @@ void upon_a_sphere( SDL_Renderer *R, GameState *GS, char *spherepath ){
 
 
 
-
-
-
-
-
-
-
-
-
-
 void among_the_stars( SDL_Renderer *R, GameState *GS, char *starspath ){
 
 	Transform T = { 0, 0, GS->cx, GS->cy, 1, 1, {0} };
@@ -998,14 +848,39 @@ void among_the_stars( SDL_Renderer *R, GameState *GS, char *starspath ){
 	SVG_Layer *CL = svg_load_layer( f, "Cosmos" );
 	//SVG_Layer_dump( CL );
 
-	// cosmic or celestial objects
-	int Cobjs_length = vec_size( CL->E );
-	SDL_Log("loaded layer Cosmos with %d elements", Cobjs_length);
-	Geo_Animation *Cobjs = SDL_calloc( Cobjs_length, sizeof(Geo_Animation) );
+	int celestials_length = vec_size( CL->E );
+	SDL_Log("loaded layer Cosmos with %d elements", celestials_length);
+	Celestial *celestials = SDL_calloc( celestials_length, sizeof(Celestial) );
+
+	int *gravitators = NULL;
+
+	vec2d spawn = v2dzero;
 
 	for (int e = 0; e < vec_size( CL->E ); ++e ){
-		Cobjs[e] = SVG_Element_to_Geo_Animation( CL, CL->E + e );
+		SDL_strlcpy( celestials[e].name, CL->E[e].id, 64 );
+		celestials[e].visual = SVG_Element_to_Geo_Animation( CL, CL->E + e );		
+		if( celestials[e].visual.cells[0].geo.type == geo_PATH ){
+			celestials[e].collider = circumscribe_Path( &(celestials[e].visual.cells[0].geo.u.path) );
+		}
+		else SDL_Log( "celestials[e].visual.cells[0].geo != path..... pls make it path" );
+
+		int ms = vec_size( CL->E[e].metadata );
+		for (int m = 0; m < ms; ++m ){
+			int t = CL->E[e].metadata[m].tag_index;
+			if( SDL_strcmp( CL->tags[t], "gravity" ) == 0 ){
+				vec_push( gravitators, e );
+				celestials[e].gravity = SDL_atof( CL->E[e].metadata[m].data );
+			}
+			else if( SDL_strcmp( CL->tags[t], "spawn" ) == 0 ){
+				spawn = celestials[e].collider.pos;
+			}
+		}
+
+		//SDL_Log( "celestials[e].visual.cells[0].style: %d.%d.%d.%d ", RGBA(celestials[e].visual.cells[0].style->stroke_color) );
 	}
+	//hand off styles
+	Style **celestial_styles = CL->styles;
+	CL->styles = NULL;
 	SVG_Layer_destroy( CL );
 
 	SVG_Layer *ZL = svg_load_layer( f, "Zones" );
@@ -1030,11 +905,17 @@ void among_the_stars( SDL_Renderer *R, GameState *GS, char *starspath ){
 
 	SDL_CloseIO( f );
 
+
+
+	int ships_N = 1;
+	Ship_inst **ships = SDL_malloc( ships_N * sizeof(Ship_inst*) );
+
+	ships[0] = GS->hero_ship;
+	ships[0]->pos = spawn;
+
+
 	//longest_path
 	SDL_FPoint *vbuf = SDL_malloc( 128 * sizeof(SDL_FPoint) );
-
-	int anim_tick_length = 20; //in frames
-	int anim_tick = 0;
 
 	SDL_Log("I am among...");
 	/* |o| |o| |o| |o| |o| |o| |o| |o| |o| |o| |o| |o| |o| |o| |o| |o| |o| |o| |o| |o| |o| |o| |o| |o| |o| */
@@ -1060,31 +941,59 @@ void among_the_stars( SDL_Renderer *R, GameState *GS, char *starspath ){
 			}
 		}
 
+		vec2d pilot_vec = DirInput_compute( &(GS->flightstick) );
+		ships[0]->heading += pilot_vec.x * 0.1;
+		if( SDL_fabsf( pilot_vec.y ) > 0.02 ){
+			vec2d thrust = v2d( 0, pilot_vec.y * 0.0625 );
+			v2d_rotate( &thrust, ships[0]->heading );
+			v2d_add( &(ships[0]->vel), thrust );
+			ships[0]->thrusting = true;
+		} else{
+			ships[0]->thrusting = false;
+		}
+		for (int g = 0; g < vec_size( gravitators ); ++g ){
+			Celestial *CG = celestials + gravitators[g];
+			vec2d diff = v2d_diff( CG->collider.pos, ships[0]->pos );
+			vec2d grav = v2d_setlen( diff, CG->gravity / v2d_magsq(diff) );
+			v2d_add( &(ships[0]->vel), grav );
+		}
+		v2d_add( &(ships[0]->pos), ships[0]->vel );
+
+
 		SDL_SetRenderDrawColor( R, 2, 2, 2, 255 );
 		SDL_RenderClear( R );
 
 		//SDL_SetRenderDrawColor( R, 255, 255, 255, 255 );
 		//gp_crosshair( R, atfX(0, T), atfY(0, T), 20 );
 
-		for (int o = 0; o < Cobjs_length; ++o ){
-			int f = 2 + Cobjs[o].current * Cobjs[o].dope_sheet[1];
-			for (int ci = 1; ci <= Cobjs[o].dope_sheet[f]; ++ci ){
-				int c = Cobjs[o].dope_sheet[f + ci];
-				SDL_SetRenderDraw_SDL_Color( R, Cobjs[o].cells[c].style.stroke_color );
-				draw_TGeo( R, &(Cobjs[o].cells[c].geo), &T, vbuf );
+		update_TM( &T, 0, 0, 0, 0 );
+
+		for (int i = 0; i < celestials_length; ++i ){
+			draw_Geo_Animation( R, &(celestials[i].visual), 
+				                   &(celestials[i].frame), 
+				                   &(celestials[i].timer),
+                         		   &T, vbuf );
+		}
+
+
+		// -- Render ships, emit FX -- 
+		for (int s = 0; s < ships_N; ++s ){
+			//SDL_Log( "s: %d", s );
+			vec2d trig = update_TM_object_rotated( &T, 0, ships[s]->heading, xy(ships[s]->pos) );
+			draw_Styled_TGeo_vec( R, ships[s]->data->visual, &T, vbuf );
+
+			if( ships[s]->thrusting ){
+
+				/* Draw exhaust visuals */
+				draw_Geo_Animation( R, &(ships[s]->data->exhaust), 
+				                    &(ships[s]->exh_frame), 
+				                    &(ships[s]->exh_timer),
+                         		    &T, vbuf );
+
+				ships[s]->thrusting = false;
 			}
 		}
 
-		anim_tick++;
-		if( anim_tick >= anim_tick_length ){
-			anim_tick = 0;
-			for (int o = 0; o < Cobjs_length; ++o ){
-				Cobjs[o].current += 1;
-				if( Cobjs[o].current >= Cobjs[o].dope_sheet[0] ){
-					Cobjs[o].current = 0;
-				}
-			}
-		}
 
 		SDL_SetRenderDrawColor( R, 100, 255, 240, 255 );
 		SDL_framerate_limit_n_monitor( R, 17 );

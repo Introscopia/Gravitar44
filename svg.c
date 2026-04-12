@@ -1,6 +1,4 @@
 #include "svg.h"
-#include "geometry.h"
-#include "ok_lib.h"
 #include "cvec.h"
 
 
@@ -336,6 +334,8 @@ static SDL_Color parse_color(const char* color_str) {
 }
 
 
+
+
 Style parse_svg_style(const char* style_string) {
     Style style = {
         .stroke = false,
@@ -396,29 +396,18 @@ Style parse_svg_style(const char* style_string) {
     return style;
 }
 
-Uint32 hash_style( Style* style ){
-    //FNV-1a style hash
-    Uint32 h = 2166136261u;
-    
-    h = (h ^ (style->stroke ? 1 : 0)) * 16777619u;
-    h = (h ^ style->stroke_color.r) * 16777619u;
-    h = (h ^ style->stroke_color.g) * 16777619u;
-    h = (h ^ style->stroke_color.b) * 16777619u;
-    h = (h ^ style->stroke_color.a) * 16777619u;
-    
-    union { float f; Uint32 u; } converter;
-    converter.f = style->stroke_width;
-    h = (h ^ converter.u) * 16777619u;
-    
-    h = (h ^ (style->fill ? 1 : 0)) * 16777619u;
-    h = (h ^ style->fill_color.r) * 16777619u;
-    h = (h ^ style->fill_color.g) * 16777619u;
-    h = (h ^ style->fill_color.b) * 16777619u;
-    h = (h ^ style->fill_color.a) * 16777619u;
-    
-    return h;
+int get_else_push_style( Style *style, map_int_int *style_map, Style ***style_vec ){
+	Uint32 H = hash_style( style );
+	int Si = ok_map_get( style_map, H )-1;
+	if( Si < 0 ){
+		Si = vec_size( *style_vec );
+		Style *neo = SDL_malloc(sizeof(Style));
+		*neo = *style;
+		vec_push( *style_vec, neo );
+		ok_map_put( style_map, H, Si+1 );
+	}
+	return Si;
 }
-
 
 #define legal_tag_firstchar(c) (SDL_isalpha(c) || c == '_')
 
@@ -507,6 +496,7 @@ void fscan_svg_group( SDL_IOStream* f, SVG_Element **evec, SVG_Layer* layer,
 		if( fseek_string( f, "<" ) ){
 			fscan_str_until_any( f, TAG, 64, " <\n\t\r" );
 			int ET = ok_map_get( element_map, TAG ) -1;
+			//SDL_Log("ET: %d\n", ET );
 
 			if( ET < 0 ){
 				SVG_Element *E = vec_new( *evec );
@@ -545,6 +535,7 @@ void fscan_svg_group( SDL_IOStream* f, SVG_Element **evec, SVG_Layer* layer,
 					}
 
 					int AT = ok_map_get( attribute_map, TAG ) -1;
+					//SDL_Log("AT: %d\n", AT );
 
 					switch( AT ){
 						case 1: // id
@@ -552,18 +543,11 @@ void fscan_svg_group( SDL_IOStream* f, SVG_Element **evec, SVG_Layer* layer,
 							break;
 						case 2:{// style
 							VAL->len = 0;
-							if( !fscan_STRBptr_until( f, VAL, "\"" ) ){
-								SDL_Log("failed to scan style string");
-							}
+							if( !fscan_STRBptr_until( f, VAL, "\"" ) ) SDL_Log("failed to scan style string");
 							Style S = parse_svg_style( VAL->str );
-							Uint32 H = hash_style( &S );
-							int Si = ok_map_get( style_map, H )-1;
-							if( Si < 0 ){
-								Si = vec_size( layer->styles );
-								vec_push( layer->styles, S );
-								ok_map_put( style_map, H, Si+1 );
-							}
-							E->style = (Style*) Si; // storing an integer in a pointer! go ahead, call the cops
+							int Si = get_else_push_style( &S, style_map, &(layer->styles) );
+							E->style = layer->styles[Si];
+							//SDL_Log("VAL->str: %s. S.stroke_color: %d.%d.%d.%d, E->style: %d.%d.%d.%d ", VAL->str, RGBA(S.stroke_color), RGBA(E->style->stroke_color) );
 							}break;
 						case 3: // d
 							if( E->u.geo.type != geo_PATH ) SDL_Log( "a d attrib?? I'm confused." );
@@ -714,6 +698,7 @@ SVG_Layer* svg_load_layer(SDL_IOStream* f, const char* layer_label ){
 	fscan_svg_group( f, &(layer->E), layer, &element_map, &attribute_map, &tag_map, &style_map, &VAL );
 
 	//SDL_Log("layer->styles:%p", layer->styles );
+	/*
 	for (int e = 0; e < vec_size(layer->E); ++e){
 		if( layer->E[e].type == SVG_GEO ){
 			int S = (int)(layer->E[e].style);
@@ -726,8 +711,8 @@ SVG_Layer* svg_load_layer(SDL_IOStream* f, const char* layer_label ){
 				layer->E[e].u.group[g].style = layer->styles + S;
 			}
 		}
-	}
-
+	}*/
+	STRB_reset( &VAL, 0 );
 	ok_map_deinit( &element_map );
 	ok_map_deinit( &attribute_map );
 	ok_map_deinit( &style_map );
@@ -745,9 +730,7 @@ Styled_Geo SVG_Element_to_Styled_Geo( SVG_Element *E ){
 			E->u.geo.u.path.N = 0;
 			E->u.geo.u.path.verts = NULL;
 		}
-		if( E->style != NULL ){
-			sg.style = *(E->style);
-		}
+		sg.style = E->style;
 	}
 	return sg;
 }
@@ -762,20 +745,40 @@ void SVG_Layer_to_Styled_Geo_vec( SVG_Layer *L, Styled_Geo **SG ){
 
 Geo_Animation SVG_Element_to_Geo_Animation( SVG_Layer *L, SVG_Element *E ){
 	Geo_Animation GA = {0};
+
 	if( E->type == SVG_GROUP ){
-		for (int m = 0; m < vec_size( E->metadata ); ++m ){
-			if( SDL_strcmp( L->tags[ E->metadata[m].tag_index ], "frames" ) == 0 ){
+
+		int ms = vec_size( E->metadata );
+		for (int m = 0; m < ms; ++m ){
+			int t = E->metadata[m].tag_index;
+			if( SDL_strcmp( L->tags[ t ], "dope_sheet" ) == 0 ){
 				GA.dope_sheet = parse_dope_sheet( E->metadata[m].data );
-				int glen = vec_size( E->u.group );
-				GA.cells = SDL_calloc( glen, sizeof(Styled_Geo) );
-				for (int g = 0; g < glen; ++g ){
-					int c = sscan_trailing_int( E->u.group[g].id );
-					//SDL_Log( "e:%d, m:%d, g: %d, c:%d", e, m, g, c );
-					if( c < 0 || c >= glen ) SDL_Log( "malformed cell name: %d", E->u.group[g].id );
-					GA.cells[c] = SVG_Element_to_Styled_Geo( E->u.group + g );
-				}
 				break;
 			}
+			else if( SDL_strcmp( L->tags[ t ], "period" ) == 0 ){
+				int millis = SDL_atoi( E->metadata[m].data );
+				GA.period = SDL_lround( millis / 16.6666666 ); // from milliseconds to 60fps frames
+			}
+		}
+
+		int glen = vec_size( E->u.group );
+
+		if( GA.dope_sheet == NULL ){
+			GA.dope_sheet = SDL_malloc( (2+(2*glen)) * sizeof(int) );
+			GA.dope_sheet[0] = glen; GA.dope_sheet[1] = 2;
+			for (int i = 0; i < glen; ++i ){
+				GA.dope_sheet[2 + i] = 1;
+				GA.dope_sheet[3 + i] = i;
+			}
+		}
+		if( GA.period <= 0 ) GA.period = 30;
+		
+		GA.cells = SDL_calloc( glen, sizeof(Styled_Geo) );
+		for (int g = 0; g < glen; ++g ){
+			int c = sscan_trailing_int( E->u.group[g].id );
+			//SDL_Log( "e:%d, m:%d, g: %d, c:%d", e, m, g, c );
+			if( c < 0 || c >= glen ) SDL_Log( "malformed cell name: %d", E->u.group[g].id );
+			GA.cells[c] = SVG_Element_to_Styled_Geo( E->u.group + g );
 		}
 	}
 	else if( E->type == SVG_GEO ){
@@ -784,6 +787,9 @@ Geo_Animation SVG_Element_to_Geo_Animation( SVG_Layer *L, SVG_Element *E ){
 		GA.dope_sheet[2] = 1; GA.dope_sheet[3] = 0;
 		GA.cells = SDL_malloc( sizeof(Styled_Geo) );
 		GA.cells[0] = SVG_Element_to_Styled_Geo( E );
+	}
+	else{
+		SDL_Log( "tried to convert SVG_Element that's neigther a group nor a geo into an animation!" );
 	}
 	return GA;
 }
@@ -840,7 +846,13 @@ void SVG_Layer_destroy( SVG_Layer *layer ){
 	}
 	vec_delete(layer->tags);
 
-	vec_delete(layer->styles);
+	if( layer->styles != NULL ){
+		int ss = vec_size( layer->styles );
+		for (int s = 0; s < ss; ++s ){
+			SDL_free( layer->styles[s] );
+		}
+		vec_delete(layer->styles);
+	}
 
 	SDL_free( layer );
 }

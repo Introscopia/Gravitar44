@@ -97,9 +97,17 @@ int main(int argc, char *argv[]){
 
 
 	load_doodads( "Classic/Doodads.svg", &(GS.lib) );
-	GS.landing_modules = NULL;
-	vec_push( GS.landing_modules, &(GS.lib.doodads[0].u.ship) );
-	GS.active_module = 0;
+	
+	int hero_id = -1;
+	for (int i = 0; i < GS.lib.doodads; ++i ){
+		if( GS.lib.doodads[i].type == SHIP &&
+			SDL_strcmp( GS.lib.doodads[i].name, "Hero" ) == 0 ){
+			GS.hero_ship = instantiate_ship( &(GS.lib.doodads[i].u.ship) );
+			SDL_Log( "found the Hero, instantiated it");
+			break;
+		}
+	}
+	
 	const char starspath [] = "Classic/SPACE.svg";
 	among_the_stars( R, &GS, starspath );
 

@@ -202,6 +202,9 @@ bool fseek_str_before_category( SDL_IOStream *f, char *str, int(*iscat)(int c) )
 bool fseek_str_before_notcategory( SDL_IOStream *f, char *str, int(*iscat)(int c) );
 void fskip_whitespace( SDL_IOStream *f );
 
+// returns ptr to the first address in str after the first instance of c.
+char* sseek_char( char *str, char c );
+
 double fscan_double(SDL_IOStream* f);
 
 // FSCAN alternatives... they all return the cursor to the position you send it at!

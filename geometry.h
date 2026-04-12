@@ -57,9 +57,11 @@ typedef struct style_struct{
 	
 } Style;
 
+Uint32 hash_style( Style* style );
+
 typedef struct{
 	Geometric geo;
-	Style style;
+	Style *style;
 } Styled_Geo;
 
 bool Lineseg_intersection(Lineseg LS1, Lineseg LS2, vec2d *intersection);
@@ -81,6 +83,9 @@ SDL_Rect geo_bb(Geometric *geo);
 Path SDL_FRect_to_Path( SDL_FRect *rect );
 
 vec2d Path_centroid( Path *p );
+
+Circle circumscribe_Path( Path *p );
+
 vec2d geo_centroid( Geometric *geo );
 
 vec2d geo_centralize( Geometric *geo ); //returns the centroid
@@ -130,18 +135,20 @@ typedef struct{
 
 	int *dope_sheet;
 	/*
-	<frame_count>, <"stride" i.e. max cells per frame>,
+	<frame_count>, <"stride" i.e. max cells per frame +1>,
 	<frame[0] cell count>, <frame[0] cell[0]>, ...
 	...
 	<frame[N] cell count>, ... <frame[N] cell[N]>; (array ends abruptly!)
 	*/
-
-	int current;
+	int period; // duration of each animation frame in 60fps frames
 
 } Geo_Animation;
 
 // parse a string formatted like this: "{0,1,2},{0,3},{1,4,5,6}"
 // where numbers are indices into cells
 int* parse_dope_sheet( const char *s );
+
+void draw_Geo_Animation( SDL_Renderer *R, Geo_Animation *A, int *current_frame, int *timer,
+                         Transform *T, SDL_FPoint *vbuf );
 
 #endif

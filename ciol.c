@@ -1,5 +1,5 @@
 
-/* CHIPMUNK INTEROPERABILITY LAYER  (formerly CHIPMUNK PHYSICS GRAPHICAL WRAPPER) */
+/* CHIPMUNK INTEROPERABILITY LAYER */
 
 #include "ciol.h"
 #include "Chipmunk/headers/chipmunk_structs.h"

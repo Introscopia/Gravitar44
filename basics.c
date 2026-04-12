@@ -61,7 +61,7 @@ SDL_Color Uint32_to_SDL_Color( Uint32 C ){
 }
 
 int SDL_SetRenderDraw_SDL_Color( SDL_Renderer *R, SDL_Color C ){
-	return SDL_SetRenderDrawColor( R, C.r, C.g, C.b, C.a);
+	return SDL_SetRenderDrawColor( R, RGBA(C) );
 }
 
 int SDL_SetRenderDraw_Uint32( SDL_Renderer *R, Uint32 C ){
@@ -657,10 +657,7 @@ void STRB_init( STRB *S, int sz ){
 }
 void STRB_ensure( STRB *S, int len ){
 	if( len >= S->cap ){
-		if( S->cap == 0 ){
-			S->cap = (SDL_ceil( len / 8.0 ) + 1 ) * 8;
-		}
-		else S->cap *= 2;
+		S->cap = ( SDL_ceil( 1.5 * len / 8.0 ) ) * 8;
 		S->str = SDL_realloc( S->str, S->cap * sizeof(char) );
 	}
 }
@@ -758,7 +755,8 @@ void STRB_delete( STRB *S, int pos ){
 void STRB_delete_range( STRB *S, int start, int stop ){
 	start = constrain( start, 0, S->len-1 );
 	stop = constrain( stop, 1, S->len );
-	if( stop - start <= 1 ){
+	if( start == stop ) return;
+	if( stop - start == 1 ){
 		return STRB_delete( S, start );
 	}
 	SDL_memmove( S->str + start, S->str + stop, (S->len+1) - stop );
@@ -852,7 +850,7 @@ void STRB_control( STRB *S, int *cursor, int CON, int KEY ){
 		}
 		*cursor = constrain( *cursor, 0, S->len );
 	}
-	else if( KEY >= ' ' ){
+	else if( SDL_isgraph( KEY ) ){ // excludes UTF8! sorry!
 		STRB_insert_char( S, KEY, *cursor );
 		*cursor += 1;
 	}
@@ -1114,9 +1112,6 @@ bool fseek_str_before_notcategory( SDL_IOStream *f, char *str, int(*iscat)(int c
 	return 0;
 }
 
-
-
-
 void fskip_whitespace( SDL_IOStream *f ){
 	Sint8 c;
 	bool status;
@@ -1125,6 +1120,23 @@ void fskip_whitespace( SDL_IOStream *f ){
 	} while( status && SDL_isspace( c ) );
 	SDL_SeekIO( f, -1, SDL_IO_SEEK_CUR );
 }
+
+
+char* sseek_char( char *str, char c ){
+	char *p = str;
+	while( *p ){
+		p++;
+		if(*p == c){
+			p++;
+			return p;
+		}
+	}
+	return NULL;
+}
+
+
+
+
 
 double fscan_double(SDL_IOStream* f) {
 	char buffer[32];

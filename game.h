@@ -4,6 +4,7 @@
 
 #include "basics.h"
 #include "transform.h"
+#include "geometry.h"
 #include "Chipmunk/headers/chipmunk.h"
 #include "ciol.h"
 #include "input.h"
@@ -13,14 +14,12 @@
 
 typedef struct ship_data_struct{
 
-	char name [64];
-
-	Geometric *physical;
-	cpProperties *properties;
+	Geometric *physical;      // vec
+	cpProperties *properties; // vec
 
 	Styled_Geo *visual; // vec
 
-	Styled_Geo *exhaust; // vec
+	Geo_Animation exhaust;
 
 	cpVect smoke_outlet;
 
@@ -40,20 +39,27 @@ typedef struct ship_inst_struct{
 	
 	Ship_data *data;
 
-	cpBody *body;
+	cpBody *body;   // used on "land" (or land-like situations)
+
+	vec2d pos, vel; // used in space (there's no physics in space, did you know?)
+	double heading;
 
 	float hull;
 	float fuel;
 	bool thrusting; // this frame (flag for rendering)
-	int exh_frame;
+
+	int exh_frame; // frame we're currently showing
+	int exh_timer; //counts down the game frames until the next exh animation tick.
 
 } Ship_inst;
 
-Ship_inst *instantiate_ship( Ship_data *data, cpSpace *space, cpVect pos );
-
+Ship_inst *instantiate_ship( Ship_data *data );
+void init_ship_physics( Ship_inst *ship, cpSpace *space, cpVect pos );
 
 
 typedef struct {
+
+	char name [64];
 
 	enum { EMPTY, SHIP, BOMB, ITEM, GATE, PARTICULARS } type;
 
@@ -76,6 +82,8 @@ typedef struct {
 	Doodad *doodads;
 
 	int longest_path;
+
+	Style **styles; // vec
 
 	//SDL_Texture *puffs;
 	//SDL_Rect puff_dims; //columns, rows, col_w, col_h
@@ -127,10 +135,22 @@ void pilot_THRUSTER( Ship_inst *S, vec2d pilot_vec, vec2d prev_pilot_vec, double
 
 
 
-typedef struct {
-	vec2d pos, vel;
 
-} Simple_inertial_flyer;	
+
+typedef struct {
+
+	char name [64];  // filename of the planet, no extention
+
+	Circle collider;
+
+	Geo_Animation visual;
+	int frame;
+	int timer;
+
+	float gravity;
+
+} Celestial; // the planets (or whatever) in the space screen.
+
 
 
 
@@ -156,9 +176,9 @@ typedef struct{
 	Input controls [10];
 
 	// Player:
-	char captain_name [128];
-	Ship_data **landing_modules; //vec
-	int active_module;
+	
+	Ship_inst *hero_ship;
+
 	// active module inventory
 	// starship inventory
 	int *wallet; //heaparray sized at the number currencies in the system

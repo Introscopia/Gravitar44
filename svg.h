@@ -2,6 +2,7 @@
 #define SVGee_H
 
 #include <SDL.h>
+#include "ok_lib.h"
 #include "basics.h"
 #include "geometry.h"
 
@@ -23,7 +24,7 @@ typedef struct svg_element_struct{
         SVG_Element *group; // vec
         char *other;        // unknown <tag>, just a string containing the tag's label.
     } u;
-    Style *style;       // reference into layer's style array
+    Style *style;       // reference into layer's styles array
     Metadata* metadata; // vec
 } SVG_Element;
 
@@ -32,11 +33,13 @@ typedef struct {
     SVG_Element *E;      // vec
     Metadata* metadata;  // vec
     char** tags;         // Unique tag names (vec)
-    Style *styles;       // vec
+    Style **styles;      // vec
 } SVG_Layer;
 
 
-SVG_Layer* svg_load_layer(SDL_IOStream* f, const char* layer_label);
+int get_else_push_style( Style *style, map_int_int *style_map, Style ***style_vec );
+
+SVG_Layer* svg_load_layer( SDL_IOStream* f, const char* layer_label );
 
 Styled_Geo SVG_Element_to_Styled_Geo( SVG_Element *E );
 void SVG_Layer_to_Styled_Geo_vec( SVG_Layer *L, Styled_Geo **SG );
