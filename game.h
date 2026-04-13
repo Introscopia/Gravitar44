@@ -3,6 +3,7 @@
 
 
 #include "basics.h"
+#include "vec2d.h"
 #include "transform.h"
 #include "geometry.h"
 #include "Chipmunk/headers/chipmunk.h"
@@ -31,7 +32,7 @@ typedef struct ship_data_struct{
 
 } Ship_data;
 
-void log_ship_data(const Ship_data* ship);
+void log_ship_data( const Ship_data* ship );
 
 
 
@@ -123,6 +124,9 @@ void render_flat_world( SDL_Renderer *R, void *W, Styled_Geo *map_visuals, Trans
 typedef void (*gravitate_func)( void *W, cpBody *body, double force );
 void flat_world_gravitate( void *W, cpBody *body, double force );
 
+typedef bool (*inside_func)( void *W, cpVect p );
+bool inside_flat_world( void *W, cpVect p );
+
 
 typedef enum { THRUST, REVTHRUST, SHIELD, GRAB, DROP, FIRE1, FIRE2, UI_YES, UI_BACK, PAUSE } ctrl_verb;
 
@@ -142,6 +146,7 @@ typedef struct {
 	char name [64];  // filename of the planet, no extention
 
 	Circle collider;
+	int collision_mode; // 'N'othing, 'P'ortal, 'K'ill
 
 	Geo_Animation visual;
 	int frame;
@@ -179,6 +184,9 @@ typedef struct{
 	
 	Ship_inst *hero_ship;
 
+	char COMING_FROM [64];
+	char GOING_TO [64];
+	int going_to_mode;
 	// active module inventory
 	// starship inventory
 	int *wallet; //heaparray sized at the number currencies in the system

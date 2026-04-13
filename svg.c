@@ -767,8 +767,8 @@ Geo_Animation SVG_Element_to_Geo_Animation( SVG_Layer *L, SVG_Element *E ){
 			GA.dope_sheet = SDL_malloc( (2+(2*glen)) * sizeof(int) );
 			GA.dope_sheet[0] = glen; GA.dope_sheet[1] = 2;
 			for (int i = 0; i < glen; ++i ){
-				GA.dope_sheet[2 + i] = 1;
-				GA.dope_sheet[3 + i] = i;
+				GA.dope_sheet[2 + 2*i] = 1;
+				GA.dope_sheet[3 + 2*i] = i;
 			}
 		}
 		if( GA.period <= 0 ) GA.period = 30;

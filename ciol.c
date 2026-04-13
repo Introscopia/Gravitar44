@@ -190,7 +190,7 @@ cpProperties retrieve_cpProperties_from_SVG_metadata( SVG_Element *E, char** Lta
 	cpProperties out = {
 		.behavior = 's',
 		.density = 0.02,
-		.friction = 1.2,
+		.friction = 0.7,
 		.elasticity = 0.35,
 		.composite = -1,
 		.collisionType = 0,

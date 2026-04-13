@@ -151,4 +151,6 @@ int* parse_dope_sheet( const char *s );
 void draw_Geo_Animation( SDL_Renderer *R, Geo_Animation *A, int *current_frame, int *timer,
                          Transform *T, SDL_FPoint *vbuf );
 
+void free_Geo_Animation( Geo_Animation *A );
+
 #endif

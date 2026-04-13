@@ -321,9 +321,9 @@ float randomF( float min, float max ){
 	return min + SDL_randf() * (max-min);
 }
 
-double random_angle(){
-	Uint32 r = SDL_rand_bits();
-	return r * ( TWO_PI / SDL_MAX_UINT32 );
+float random_angle(){
+	//double r = (SDL_rand_bits() / (double)SDL_MAX_UINT32);
+	return SDL_randf() * TWO_PI;
 }
 
 int random_from_list(int n, ...){

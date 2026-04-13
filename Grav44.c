@@ -5,6 +5,8 @@
 * HP, bullet modifier, collision modifier
 * fuel tank size
 * time factor, sim iterations
+* toggle smoke fx
+* Select player color! / game palettes!
 */
 #include <SDL.h>
 #include "basics.h"
@@ -86,15 +88,17 @@ int main(int argc, char *argv[]){
 	SDL_free( gamepad_list );
 
 
-	GS.controls[SHIELD]    = (Input){ .type = INPUT_NULL };
-	GS.controls[GRAB]      = (Input){ .type = INPUT_NULL };
-	GS.controls[DROP]      = (Input){ .type = INPUT_NULL };
-	GS.controls[FIRE1]     = (Input){ .type = INPUT_NULL };
-	GS.controls[FIRE2]     = (Input){ .type = INPUT_NULL };
-	GS.controls[UI_YES]    = (Input){ .type = INPUT_KEYBOARD, .detail.key = SDLK_E };
-	GS.controls[UI_BACK]   = (Input){ .type = INPUT_KEYBOARD, .detail.key = SDLK_Q };
-	GS.controls[PAUSE]     = (Input){ .type = INPUT_KEYBOARD, .detail.key = SDLK_ESCAPE };
+	GS.controls[SHIELD]  = (Input){ .type = INPUT_NULL };
+	GS.controls[GRAB]    = (Input){ .type = INPUT_NULL };
+	GS.controls[DROP]    = (Input){ .type = INPUT_NULL };
+	GS.controls[FIRE1]   = (Input){ .type = INPUT_NULL };
+	GS.controls[FIRE2]   = (Input){ .type = INPUT_NULL };
+	GS.controls[UI_YES]  = (Input){ .type = INPUT_KEYBOARD, .detail.key = SDLK_E };
+	GS.controls[UI_BACK] = (Input){ .type = INPUT_KEYBOARD, .detail.key = SDLK_Q };
+	GS.controls[PAUSE]   = (Input){ .type = INPUT_KEYBOARD, .detail.key = SDLK_ESCAPE };
 
+
+	char FOLDER [] = "Classic";
 
 	load_doodads( "Classic/Doodads.svg", &(GS.lib) );
 	
@@ -103,13 +107,40 @@ int main(int argc, char *argv[]){
 		if( GS.lib.doodads[i].type == SHIP &&
 			SDL_strcmp( GS.lib.doodads[i].name, "Hero" ) == 0 ){
 			GS.hero_ship = instantiate_ship( &(GS.lib.doodads[i].u.ship) );
-			SDL_Log( "found the Hero, instantiated it");
+			SDL_Log( "found the Hero, instantiated it" );
 			break;
 		}
 	}
-	
-	const char starspath [] = "Classic/SPACE.svg";
-	among_the_stars( R, &GS, starspath );
+
+	SDL_strlcpy( GS.COMING_FROM, "BASE", 64 ); 
+	SDL_strlcpy( GS.GOING_TO, "SPACE", 64 );
+	GS.going_to_mode = 'T';
+
+	while( 1 ){
+		
+		char path [128];
+		SDL_snprintf( path, 128, "%s/%s.svg", FOLDER, GS.GOING_TO );
+
+		if( GS.going_to_mode == 'T' ){
+			among_the_stars( R, &GS, path );
+		} 
+		else if( GS.going_to_mode == 'P' ){
+			upon_a_sphere( R, &GS, path );
+		}
+		else if( GS.going_to_mode == 'Q' ){
+			SDL_Log( "quitting!!" );
+			break;
+		}
+		else if( GS.going_to_mode == 'O' ){
+			SDL_Log( "game over!!" );
+			break;
+		}
+		else{
+			SDL_Log( ">>>>%s!!", GS.GOING_TO );
+			break;
+		}
+
+	}
 
 	/*
 	SDL_Log("<<<Entering Main Loop>>>");

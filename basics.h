@@ -94,7 +94,7 @@ int get_divisors( int *list, int N );
 // RANDOM: "array rules" min inclusive, max not inclusive
 int randomI( int min, int max );
 float randomF( float min, float max );
-double random_angle();
+float random_angle();
 int random_from_list( int n, ... );
 double random_gaussian();
 double fast_gaussian();

@@ -569,6 +569,28 @@ void draw_Geo_Animation( SDL_Renderer *R, Geo_Animation *A, int *current_frame, 
 	}
 }
 
+void free_Geo_Animation( Geo_Animation *A ){
+
+	int max_cell = 0;
+	for (int f = 0; f < A->dope_sheet[0]; ++f ){
+		int off = 2 + f * A->dope_sheet[1];
+		for (int i = 1; i <= A->dope_sheet[off]; ++i ){
+			if( A->dope_sheet[off+i] > max_cell ){
+				max_cell = A->dope_sheet[off+i];
+			}
+		}
+	}
+
+	for (int c = 0; c < max_cell; ++c ){
+		if( A->cells[c].geo.type == geo_PATH &&
+		    A->cells[c].geo.u.path.N > 0 ){
+			SDL_free( A->cells[c].geo.u.path.verts );
+		}
+	}
+	SDL_free( A->cells );
+	SDL_free( A->dope_sheet );
+
+}
 
 
 

@@ -477,10 +477,13 @@ void flat_world_gravitate( void *W, cpBody *body, double force ){
 	cpBodyAddVelocity( body, cpv( 0, g ) );
 }
 
+bool inside_flat_world( void *W, cpVect p ){
+	flat_world *fw = (flat_world*) W;
+	return coordinates_in_FRect( xy(p), &(fw->bounds) );
+}
 
-
-
-void create_smokepuff( cpSpace *space, OBJ *O, cpVect pos, cpVect vel, Library *lib ){
+// ps: puffscale
+void create_smokepuff( cpSpace *space, OBJ *O, float ps, cpVect pos, cpVect vel, Library *lib ){
 
 	O->body = cpSpaceAddBody( space, cpBodyNew(0, 0) );
 	cpBodySetPosition( O->body, pos );
@@ -492,7 +495,9 @@ void create_smokepuff( cpSpace *space, OBJ *O, cpVect pos, cpVect vel, Library *
 	cpBodySetAngle( O->body, random_angle() );
 	//cpShape *shape = cpCircleShapeNew( O->body, 5, cpvzero );
 	// equilateral triangle, circumradius=4
-	cpVect points [3] = { cpv( 1.5, 0), cpv( -0.75, 2.25 / SQRT3 ), cpv( -0.75, -2.25 / SQRT3 ) };
+	cpVect points [3] = { cpv( ps *  1.5,        0 ), 
+						  cpv( ps * -0.75, ps *  2.25 / SQRT3 ), 
+						  cpv( ps * -0.75, ps * -2.25 / SQRT3 ) };
 	for (int v = 0; v < 3; ++v ){ // now fudge it up a little
 		points[v] = cpvadd( points[v], cpv_polar( 0.5, random_angle() ) );
 	}
@@ -525,7 +530,7 @@ void upon_a_sphere( SDL_Renderer *R, GameState *GS, char *spherepath ){
 
 
 	Transform T = { 0, 0, GS->cx, GS->cy, 1, 1, {0} };
-	set_scale( &T, 2 );
+	set_scale( &T, 1 );
 	int scaleI = logarithm( 1.1, T.s );
 	double dscaleI = scaleI;
 	float min_scaleI = 0;
@@ -534,10 +539,13 @@ void upon_a_sphere( SDL_Renderer *R, GameState *GS, char *spherepath ){
 	render_world_func render_world = NULL;
 	world_bounding_func world_bounding = NULL;
 	gravitate_func gravitate = NULL;
+	inside_func inside = NULL;
 	double world_angle = 0;
 	update_camera_func update_camera = NULL;
 	m_update_func camera_matrix = NULL;
 	voidptr_func destroy_world = NULL;
+
+	double grav_max = 10;
 
 	//SDL_Log( "loading Physical layer from file \"%s\".", spherepath );
 	SDL_IOStream *f = SDL_IOFromFile( spherepath, "r" );
@@ -545,12 +553,23 @@ void upon_a_sphere( SDL_Renderer *R, GameState *GS, char *spherepath ){
 	SVG_Layer *PL = svg_load_layer( f, "Physical" );
 	//SDL_Log( "converting layer to space...");
 	SVG_layer_into_cpSpace( PL, space, false );
+
+	for (int m = 0; m < vec_size( PL->metadata ); ++m ){
+		int t = PL->metadata[m].tag_index;
+		if( SDL_strcmp( PL->tags[t], "gravity" ) == 0 ){
+			grav_max = SDL_atof( PL->metadata[m].data );
+		}
+	}
+
 	SVG_Layer_destroy( PL );
 
 	//SDL_Log( "done.\n now loading Visual layer" );
 	SVG_Layer *VL = svg_load_layer( f, "Visual" );
 	Styled_Geo *map_visuals = NULL;
 	SVG_Layer_to_Styled_Geo_vec( VL, &map_visuals );
+	// hand off style lib
+	Style **visual_styles = VL->styles;
+	VL->styles = NULL;
 	SVG_Layer_destroy( VL );
 
 	cpVect spawn = cpvzero;
@@ -566,11 +585,17 @@ void upon_a_sphere( SDL_Renderer *R, GameState *GS, char *spherepath ){
 				render_world = render_flat_world;
 				world_bounding = flat_world_bounding;
 				gravitate = flat_world_gravitate;
+				inside = inside_flat_world;
 				update_camera = flat_world_update_camera;
 				camera_matrix = update_TM_object_rotated;
 				destroy_world = destroy_flat_world;
-				min_scaleI = logarithm( 1.1, GS->width / ZL->E[z].u.geo.u.box.w );
-				spawn = cpv( randomF(0, ZL->E[z].u.geo.u.box.w), ZL->E[z].u.geo.u.box.y );
+				SDL_FRect windowrect = (SDL_FRect){0,0,GS->width, GS->height};
+				SDL_FRect dst = ZL->E[z].u.geo.u.box;
+				fit_frect( &dst, &windowrect );
+				set_scale( &T, dst.w / ZL->E[z].u.geo.u.box.w );
+				min_scaleI = logarithm( 1.1, T.s );
+				spawn = cpv( randomF(0, ZL->E[z].u.geo.u.box.w), 
+							 ZL->E[z].u.geo.u.box.y + (0.02 * ZL->E[z].u.geo.u.box.h) );
 			}
 			else if( ZL->E[z].u.geo.type == geo_CIRCLE ){
 				camera_matrix = update_TM_combined;
@@ -586,7 +611,7 @@ void upon_a_sphere( SDL_Renderer *R, GameState *GS, char *spherepath ){
 	SVG_Layer_destroy( ZL );
 
 	//cpSpaceSetGravity( space, cpv(0, 10) );
-	double grav_max = 10;
+	
 
 	//SDL_Log( "done.\n now loading Holo layer" );
 	SVG_Layer *HL = svg_load_layer( f, "Holo" );
@@ -623,6 +648,10 @@ void upon_a_sphere( SDL_Renderer *R, GameState *GS, char *spherepath ){
 	OBJ_Page PUFFOBJS;
 	init_OBJ_Page( &PUFFOBJS );
 
+	float puffscale = 1;
+	Circle circumship0 = circumscribe_Path( &(ships[0]->data->physical[0].u.path) );
+	puffscale = circumship0.radius / 3.5; //heuristic!
+
 
 	int longest_path = 0;
 	for (int i = 0; i < vec_size(map_visuals); ++i ){
@@ -643,7 +672,7 @@ void upon_a_sphere( SDL_Renderer *R, GameState *GS, char *spherepath ){
 
 	int sim_iterations = 6;
 	double delta_time = (1.0 / 30.0) / sim_iterations;
-	SDL_Log( "sim_iterations: %d, delta: %lg", sim_iterations, delta_time );
+	//SDL_Log( "sim_iterations: %d, delta: %lg", sim_iterations, delta_time );
 
 	// warm up the sim
 	for (int i = 0; i < 3; ++i ){
@@ -664,6 +693,8 @@ void upon_a_sphere( SDL_Renderer *R, GameState *GS, char *spherepath ){
 			if( !captured ){
 				switch (event.type) {
 					case SDL_EVENT_QUIT:
+						SDL_strlcpy( GS->GOING_TO, "QUIT", 64 );
+						GS->going_to_mode = 'Q';
 						goto end;
 
 					case SDL_EVENT_MOUSE_WHEEL:;
@@ -677,7 +708,7 @@ void upon_a_sphere( SDL_Renderer *R, GameState *GS, char *spherepath ){
 					case SDL_EVENT_KEY_UP:
 						if( event.key.key == SDLK_F9 ){
 							debug_view = !debug_view;
-							SDL_Log( "T = { %lg, %lg,  %g, %g,  %g }", T.tx, T.ty, T.cx, T.cy, T.s );
+							//SDL_Log( "T = { %lg, %lg,  %g, %g,  %g }", T.tx, T.ty, T.cx, T.cy, T.s );
 						}
 						else if( event.key.key == SDLK_P ){
 							SDL_Log("exporting textures...");
@@ -731,6 +762,13 @@ void upon_a_sphere( SDL_Renderer *R, GameState *GS, char *spherepath ){
 		prev_pilot_vec = pilot_vec;
  
 		cpVect p1pos = cpBodyGetPosition( ships[0]->body );
+
+		if( !inside( world_data, p1pos ) ){
+			SDL_strlcpy( GS->COMING_FROM, GS->GOING_TO, 64 );
+			SDL_strlcpy( GS->GOING_TO, "SPACE", 64 );
+			GS->going_to_mode = 'T';
+			goto end;
+		}
 		
 		update_camera( &T, p1pos );
 
@@ -770,10 +808,10 @@ void upon_a_sphere( SDL_Renderer *R, GameState *GS, char *spherepath ){
 				/* Create smoke */
 				OBJ *slot = fresh_OBJ_slot( &PUFFOBJS );
 				cpVect svel = cpvmult( cpBodyGetVelocity( ships[s]->body ), 0.5 );
-				cpVect exhvel = cpv_rottrig( cpv( 0, 32 ), trig );//v2d_rotate( cpv( 0, 32 ), sheading ); //cpBodyLocalToWorld( ships[s]->body, cpv( 0, 32 ) );
+				cpVect exhvel = cpv_rottrig( cpv( 0, puffscale * 32 ), trig );//v2d_rotate( cpv( 0, 32 ), sheading ); //cpBodyLocalToWorld( ships[s]->body, cpv( 0, 32 ) );
 				cpVect vel = cpvadd( svel, exhvel );
 				cpVect pos = cpBodyLocalToWorld( ships[s]->body, ships[s]->data->smoke_outlet );
-				create_smokepuff( space, slot, pos, vel, &(GS->lib) );
+				create_smokepuff( space, slot, puffscale, pos, vel, &(GS->lib) );
 
 				ships[s]->thrusting = false;
 			}
@@ -793,7 +831,7 @@ void upon_a_sphere( SDL_Renderer *R, GameState *GS, char *spherepath ){
 					int *age = (int*)(OP->objs[i].data);
 					SDL_SetRenderDrawColor( R, 255, 255, 255, constrain(map(*age, 0, 35, 0, 255), 0, 255) );
 					TM_APPLY_TO( obpos, obpos, T.M );
-					gp_fill_8circle( R, obpos.x, obpos.y, T.s * 1.8 );
+					gp_fill_8circle( R, obpos.x, obpos.y, T.s * 1.8 * puffscale );
 
 					if( OP->objs[i].tick( OP->objs + i ) ){
 						OBJ_expired( OP, i );
@@ -821,6 +859,12 @@ void upon_a_sphere( SDL_Renderer *R, GameState *GS, char *spherepath ){
 	cpSpaceFree(space);
 
 	destroy_world( world_data );
+
+	int vss = vec_size( visual_styles );
+	for (int i = 0; i < vss; ++i ){
+		SDL_free( visual_styles[i] );
+	}
+	vec_delete( visual_styles );
 	
 	SDL_free( vbuf );
 }
@@ -861,6 +905,7 @@ void among_the_stars( SDL_Renderer *R, GameState *GS, char *starspath ){
 		celestials[e].visual = SVG_Element_to_Geo_Animation( CL, CL->E + e );		
 		if( celestials[e].visual.cells[0].geo.type == geo_PATH ){
 			celestials[e].collider = circumscribe_Path( &(celestials[e].visual.cells[0].geo.u.path) );
+			celestials[e].collider.radius *= celestials[e].collider.radius; //we only need the square of the radius;
 		}
 		else SDL_Log( "celestials[e].visual.cells[0].geo != path..... pls make it path" );
 
@@ -871,8 +916,23 @@ void among_the_stars( SDL_Renderer *R, GameState *GS, char *starspath ){
 				vec_push( gravitators, e );
 				celestials[e].gravity = SDL_atof( CL->E[e].metadata[m].data );
 			}
-			else if( SDL_strcmp( CL->tags[t], "spawn" ) == 0 ){
+			/*else if( SDL_strcmp( CL->tags[t], "spawn" ) == 0 ){
 				spawn = celestials[e].collider.pos;
+			}*/
+			else if( SDL_strcmp( CL->tags[t], "portal" ) == 0 ){
+				celestials[e].collision_mode = 'P';
+			}
+			else if( SDL_strcmp( CL->tags[t], "kill" ) == 0 ){
+				celestials[e].collision_mode = 'K';
+			}
+		}
+
+		if( SDL_strcmp( celestials[e].name, GS->COMING_FROM ) == 0 ){
+			spawn = celestials[e].collider.pos;
+			if( celestials[e].collision_mode == 'P' ){
+				float theta = random_angle();
+				GS->hero_ship->heading = theta + HALF_PI;
+				v2d_add( &spawn, v2d_from_polar( 1.2 * SDL_sqrtf(celestials[e].collider.radius), theta ) );
 			}
 		}
 
@@ -912,6 +972,7 @@ void among_the_stars( SDL_Renderer *R, GameState *GS, char *starspath ){
 
 	ships[0] = GS->hero_ship;
 	ships[0]->pos = spawn;
+	ships[0]->vel = v2dzero;
 
 
 	//longest_path
@@ -933,6 +994,8 @@ void among_the_stars( SDL_Renderer *R, GameState *GS, char *starspath ){
 			if( !captured ){
 				switch (event.type) {
 					case SDL_EVENT_QUIT:
+						SDL_strlcpy( GS->GOING_TO, "QUIT", 64 );
+						GS->going_to_mode = 'Q';
 						goto end;
 
 					case SDL_EVENT_MOUSE_MOTION:
@@ -948,7 +1011,7 @@ void among_the_stars( SDL_Renderer *R, GameState *GS, char *starspath ){
 			v2d_rotate( &thrust, ships[0]->heading );
 			v2d_add( &(ships[0]->vel), thrust );
 			ships[0]->thrusting = true;
-		} else{
+		} else {
 			ships[0]->thrusting = false;
 		}
 		for (int g = 0; g < vec_size( gravitators ); ++g ){
@@ -958,6 +1021,21 @@ void among_the_stars( SDL_Renderer *R, GameState *GS, char *starspath ){
 			v2d_add( &(ships[0]->vel), grav );
 		}
 		v2d_add( &(ships[0]->pos), ships[0]->vel );
+
+		for (int i = 0; i < celestials_length; ++i ){
+			if( v2d_distsq( ships[0]->pos, celestials[i].collider.pos ) < celestials[i].collider.radius ){
+				switch( celestials[i].collision_mode ){
+					case 'P':
+						SDL_strlcpy( GS->GOING_TO, celestials[i].name, 64 );
+						GS->going_to_mode = 'P';
+						goto end;
+
+					case 'K':
+						// trigger particles, check lives, trigger respawan timer or go to GAMEOVER
+						break;
+				}
+			}
+		}
 
 
 		SDL_SetRenderDrawColor( R, 2, 2, 2, 255 );
@@ -983,14 +1061,10 @@ void among_the_stars( SDL_Renderer *R, GameState *GS, char *starspath ){
 			draw_Styled_TGeo_vec( R, ships[s]->data->visual, &T, vbuf );
 
 			if( ships[s]->thrusting ){
-
-				/* Draw exhaust visuals */
 				draw_Geo_Animation( R, &(ships[s]->data->exhaust), 
-				                    &(ships[s]->exh_frame), 
-				                    &(ships[s]->exh_timer),
-                         		    &T, vbuf );
-
-				ships[s]->thrusting = false;
+				                       &(ships[s]->exh_frame), 
+				                       &(ships[s]->exh_timer),
+                         		       &T, vbuf );
 			}
 		}
 
@@ -1002,6 +1076,19 @@ void among_the_stars( SDL_Renderer *R, GameState *GS, char *starspath ){
 		
 	}//%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 	end:
+
+	vec_delete( gravitators );
+
+	for (int i = 0; i < celestials_length; ++i ){
+		free_Geo_Animation( &(celestials[i].visual) );
+	}
+	SDL_free( celestials );
+
+	int css = vec_size( celestial_styles );
+	for (int i = 0; i < css; ++i ){
+		SDL_free( celestial_styles[i] );
+	}
+	vec_delete( celestial_styles );
 
 	SDL_free( vbuf );
 }

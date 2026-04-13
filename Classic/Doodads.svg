@@ -86,9 +86,9 @@
        id="Hero"
        class="ship"
        density="0.01"
-       friction="0.15"
-       thrust="800"
-       turn_speed="200"
+       friction="0.06"
+       thrust="200000"
+       turn_speed="260"
        fuel_max="8000"
        fuel_consumption="0.25">
       <path
