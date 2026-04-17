@@ -80,6 +80,8 @@ void fade_Texture( SDL_Renderer *R, SDL_Texture *T, Uint8 alpha );
 
 #define xyp(V) V->x, V->y
 
+#define xywh(R) R.x, R.y, R.w, R.h
+
 #define RGBA(C) C.r, C.g, C.b, C.a
 
 
@@ -257,8 +259,8 @@ void up_one_folder( char *path );
 Uint16 *ascii_to_unicode( char *str );
 
 bool cursor_in_rect( SDL_Event *event, SDL_Rect *R );
-bool coordinates_in_Rect( float x, float y, SDL_Rect *R );
-bool coordinates_in_FRect( float x, float y, SDL_FRect *R );
+bool coordinates_in_Rect( float x, float y, SDL_Rect R );
+bool coordinates_in_FRect( float x, float y, SDL_FRect R );
 bool SDL_Rect_overlap( SDL_Rect *A, SDL_Rect *B );
 bool SDL_FRect_overlap( SDL_FRect *A, SDL_FRect *B );
 bool rect_overlap( int Ax, int Ay, int Aw, int Ah, int Bx, int By, int Bw, int Bh );

@@ -175,10 +175,15 @@ cpvslerpconst(const cpVect v1, const cpVect v2, const cpFloat a)
 	return cpvslerp(v1, v2, cpfmin(a, omega)/omega);
 }
 
+static inline cpVect cpvsetlength( const cpVect v, cpFloat len )
+{
+	return cpvmult(cpvnormalize(v), len);
+}
+
 /// Clamp v to length len.
 static inline cpVect cpvclamp(const cpVect v, const cpFloat len)
 {
-	return (cpvdot(v,v) > len*len) ? cpvmult(cpvnormalize(v), len) : v;
+	return (cpvdot(v,v) > len*len) ? cpvsetlength(v,len) : v;
 }
 
 /// Linearly interpolate between v1 towards v2 by distance d.

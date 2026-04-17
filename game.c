@@ -354,16 +354,19 @@ void pilot_THRUSTER( Ship_inst *S, vec2d pilot_vec, vec2d prev_pilot_vec, double
 
 
 
-void init_flat_world( void **W, SDL_FRect bounds, Styled_Geo *map_visuals, int width ){
+void init_flat_world( void **W, SDL_FRect bounds, SDL_FRect goff, Styled_Geo *map_visuals, int width ){
 
 	*W = SDL_malloc( sizeof(flat_world) );
 	flat_world *fw = (flat_world*)(*W);
 
+	fw->bounds = bounds;
+	fw->gravity_falloff = goff;
+
 	fw->chunks_N = 6;
 	fw->chunks = SDL_calloc( fw->chunks_N, sizeof(int*) );
-	fw->bounds = bounds;
 	fw->chunk_w = bounds.w / fw->chunks_N;
 	fw->width = width;
+	
 	//SDL_Log("chunk_w: %g\n", chunk_w );
 	int map_N = vec_size( map_visuals );
 	for (int i = 0; i < map_N; ++i ){
@@ -388,7 +391,6 @@ void init_flat_world( void **W, SDL_FRect bounds, Styled_Geo *map_visuals, int w
 
 	fw->gravity_falloff = (SDL_FRect){-999999};
 }
-
 void destroy_flat_world( void *W ){
 	flat_world *fw = (flat_world*) W;
 	SDL_free( fw->deja_rendu );
@@ -398,12 +400,6 @@ void destroy_flat_world( void *W ){
 	SDL_free( fw->chunks );
 	SDL_free( W );
 }
-
-void flat_world_set_gravity_falloff( void *W, SDL_FRect rct ){
-	flat_world *fw = (flat_world*) W;
-	fw->gravity_falloff = rct;
-}
-
 void flat_world_bounding( void *W, cpBody *b ){
 	flat_world *fw = (flat_world*) W;
 	cpVect pos = cpBodyGetPosition( b );
@@ -416,13 +412,11 @@ void flat_world_bounding( void *W, cpBody *b ){
 		cpBodySetPosition( b, pos );
 	}
 }
-
-void flat_world_update_camera( Transform *T, cpVect target ){
+void flat_world_update_camera( Transform *T, cpVect target, double *world_angle ){
 	T->tx = target.x;
 	T->ty = target.y;
 	update_TM( T, 0, 0, 0, 0 );
 }
-
 void render_flat_world( SDL_Renderer *R, void *W, Styled_Geo *map_visuals, Transform *T, SDL_FPoint *vbuf ){
 	flat_world *fw = (flat_world*) W;
 
@@ -467,7 +461,6 @@ void render_flat_world( SDL_Renderer *R, void *W, Styled_Geo *map_visuals, Trans
 		}
 		}*/
 }
-
 void flat_world_gravitate( void *W, cpBody *body, double force ){
 	flat_world *fw = (flat_world*) W;
 	cpVect p = cpBodyGetPosition( body );
@@ -476,11 +469,81 @@ void flat_world_gravitate( void *W, cpBody *body, double force ){
 	//cpBodyApplyForceAtWorldPoint( body, cpv( 0, g ), p );
 	cpBodyAddVelocity( body, cpv( 0, g ) );
 }
-
 bool inside_flat_world( void *W, cpVect p ){
 	flat_world *fw = (flat_world*) W;
-	return coordinates_in_FRect( xy(p), &(fw->bounds) );
+	//return coordinates_in_FRect( xy(p), &(fw->bounds) );
+	if( coordinates_in_FRect( xy(p), fw->bounds ) ) return true;
+	else{
+		SDL_Log( "out! %lg, %lg.  %g, %g, %g, %g", p.x, p.y, xywh(fw->bounds) );
+		return false;
+	}
 }
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+void init_round_world( void **W, double brad, double srad ){
+	*W = SDL_malloc( sizeof(round_world) );
+	round_world *rw = (round_world*)(*W);
+	rw->bounds = brad;
+	rw->bounds_sq = brad * brad;
+	rw->surface_rad = srad;
+	rw->surface_radsq = srad * srad;
+	rw->surface_radcubed = rw->surface_radsq * srad;
+}
+void destroy_round_world( void *W ){
+	//round_world *rw = (round_world*) W;
+	SDL_free( W );
+}
+void round_world_bounding( void *W, cpBody *b ){
+	//round_world *rw = (round_world*) W;
+	//cpVect pos = cpBodyGetPosition( b );
+}
+void round_world_update_camera( Transform *T, cpVect target, double *world_angle ){
+	T->tx = target.x;
+	T->ty = target.y;
+
+	double tmsq = cpvlengthsq( target );
+	double cam_theta = angle_diff( -cpvtoangle( target ) -HALF_PI, *world_angle );
+	double cam_theta_mag = SDL_fabs( cam_theta );
+	double factor = ellipticalMap(constrainD(cam_theta_mag,0,HALF_PI), HALF_PI, 0, 1, 0) * 0.16;
+	double cam_power = easeInOutQuad( constrainD(tmsq / 22500, 0, 1) * factor ); // sq(KR) == 150^2 == 22,500
+	if(cam_power > cam_theta_mag){
+		*world_angle += cam_theta;
+	}else{
+		*world_angle += SDL_copysign( cam_power, cam_theta );
+	}
+
+	update_TM_world_rotated( T, *world_angle, 0, 0, 0 );
+}
+void render_round_world( SDL_Renderer *R, void *W, Styled_Geo *map_visuals, Transform *T, SDL_FPoint *vbuf ){
+	round_world *rw = (round_world*) W;
+	draw_Styled_TGeo_vec( R, map_visuals, T, vbuf );
+}
+void round_world_gravitate( void *W, cpBody *body, double force ){
+	round_world *rw = (round_world*) W;
+	cpVect grav = cpvzero;
+	cpVect p = cpBodyGetPosition( body );
+	double plsq = cpvlengthsq(p);
+	double pl = SDL_sqrt(plsq);
+	if( plsq > rw->surface_radsq ){
+		grav = cpvmult( cpvneg(p), force / ((plsq * pl) + CPFLOAT_MIN) );
+	}else{
+		grav = cpvmult( cpvneg(p), force / rw->surface_radcubed );
+	}
+	cpBodyAddVelocity( body, grav );
+}
+void round_world_gravitate_simple( void *W, cpBody *body, double force ){
+	round_world *rw = (round_world*) W;
+	cpVect p = cpBodyGetPosition( body );
+	double plsq = cpvlengthsq(p);
+	double pl = SDL_sqrt(plsq);
+	cpVect grav = cpvmult( cpvneg(p), force / ((plsq * pl) + CPFLOAT_MIN) );
+	cpBodyAddVelocity( body, grav );
+}
+bool inside_round_world( void *W, cpVect p ){
+	round_world *rw = (round_world*) W;
+	double plsq = cpvlengthsq(p);
+	return ( plsq < rw->bounds_sq );
+}
+
 
 // ps: puffscale
 void create_smokepuff( cpSpace *space, OBJ *O, float ps, cpVect pos, cpVect vel, Library *lib ){
@@ -534,18 +597,21 @@ void upon_a_sphere( SDL_Renderer *R, GameState *GS, char *spherepath ){
 	int scaleI = logarithm( 1.1, T.s );
 	double dscaleI = scaleI;
 	float min_scaleI = 0;
+	double world_angle = 0;
+	float KR = 150;
+
 
 	void *world_data = NULL;
 	render_world_func render_world = NULL;
 	world_bounding_func world_bounding = NULL;
 	gravitate_func gravitate = NULL;
 	inside_func inside = NULL;
-	double world_angle = 0;
+	
 	update_camera_func update_camera = NULL;
 	m_update_func camera_matrix = NULL;
 	voidptr_func destroy_world = NULL;
 
-	double grav_max = 10;
+	double grav_max = 0;
 
 	//SDL_Log( "loading Physical layer from file \"%s\".", spherepath );
 	SDL_IOStream *f = SDL_IOFromFile( spherepath, "r" );
@@ -576,45 +642,75 @@ void upon_a_sphere( SDL_Renderer *R, GameState *GS, char *spherepath ){
 
 	//SDL_Log( "done.\n now loading Zones layer" );
 	SVG_Layer *ZL = svg_load_layer( f, "Zones" );
+
+	Geometric bounds = { geo_NULL };
+	Geometric gravity_falloff = { geo_NULL };
 	
 	for (int z = 0; z < vec_size(ZL->E); ++z ){
 		if( SDL_strcmp( ZL->E[z].id, "bounds" ) == 0 ){
 			//SDL_Log("bounds!");
-			if( ZL->E[z].u.geo.type == geo_BOX ){
-				init_flat_world( &world_data, ZL->E[z].u.geo.u.box, map_visuals, GS->width );
-				render_world = render_flat_world;
-				world_bounding = flat_world_bounding;
-				gravitate = flat_world_gravitate;
-				inside = inside_flat_world;
-				update_camera = flat_world_update_camera;
-				camera_matrix = update_TM_object_rotated;
-				destroy_world = destroy_flat_world;
-				SDL_FRect windowrect = (SDL_FRect){0,0,GS->width, GS->height};
-				SDL_FRect dst = ZL->E[z].u.geo.u.box;
-				fit_frect( &dst, &windowrect );
-				set_scale( &T, dst.w / ZL->E[z].u.geo.u.box.w );
-				min_scaleI = logarithm( 1.1, T.s );
-				spawn = cpv( randomF(0, ZL->E[z].u.geo.u.box.w), 
-							 ZL->E[z].u.geo.u.box.y + (0.02 * ZL->E[z].u.geo.u.box.h) );
-			}
-			else if( ZL->E[z].u.geo.type == geo_CIRCLE ){
-				camera_matrix = update_TM_combined;
-				min_scaleI = logarithm( 1.1, GS->width / 2.4 * ZL->E[z].u.geo.u.circle.radius );
-			}
+			bounds = ZL->E[z].u.geo;
 		}
 		else if( SDL_strcmp( ZL->E[z].id, "gravity_falloff" ) == 0 ){
-			if( world_data == NULL ) SDL_Log( "gravity_falloff before bounds.....(that's bad!)" );
-			flat_world_set_gravity_falloff( world_data, ZL->E[z].u.geo.u.box );
 			//SDL_Log("gravity_falloff!");
+			gravity_falloff = ZL->E[z].u.geo;
 		}
 	}
+
+	if( bounds.type == geo_BOX ){
+		init_flat_world( &world_data, bounds.u.box, gravity_falloff.u.box, map_visuals, GS->width );
+		render_world = render_flat_world;
+		world_bounding = flat_world_bounding;
+		gravitate = flat_world_gravitate;
+		inside = inside_flat_world;
+		update_camera = flat_world_update_camera;
+		camera_matrix = update_TM_object_rotated;
+		destroy_world = destroy_flat_world;
+
+		SDL_FRect windowrect = (SDL_FRect){0,0,GS->width, GS->height};
+		SDL_FRect dst = bounds.u.box;
+		fit_frect( &dst, &windowrect );
+		set_scale( &T, dst.w / bounds.u.box.w );
+		min_scaleI = logarithm( 1.1, T.s );
+
+		spawn = cpv( randomF(0, bounds.u.box.w), 
+					 bounds.u.box.y + (0.02 * bounds.u.box.h) );
+	}
+	else if( bounds.type == geo_CIRCLE ){
+		double srad = 0;
+		if( gravity_falloff.type == geo_CIRCLE ) srad = gravity_falloff.u.circle.radius;
+		init_round_world( &world_data, bounds.u.circle.radius, srad );
+		render_world = render_round_world;
+		world_bounding = round_world_bounding;
+		if( gravity_falloff.type == geo_CIRCLE ){
+			gravitate = round_world_gravitate;
+		} else {
+			gravitate = round_world_gravitate_simple; 
+		}
+		inside = inside_round_world;
+		update_camera = round_world_update_camera;
+		camera_matrix = update_TM_combined;
+		destroy_world = destroy_round_world;
+		
+		SDL_FRect windowrect = (SDL_FRect){0,0,GS->width, GS->height};
+		SDL_FRect dst = (SDL_FRect){ -(bounds.u.circle.radius),  -(bounds.u.circle.radius),
+									2*(bounds.u.circle.radius), 2*(bounds.u.circle.radius) };
+		fit_frect( &dst, &windowrect );
+		set_scale( &T, dst.w / (2*(bounds.u.circle.radius)) );
+		min_scaleI = logarithm( 1.1, T.s );
+
+		world_angle = random_angle();
+		spawn = cpv_polar( 0.97*(bounds.u.circle.radius), world_angle - HALF_PI );
+	}
+
+
 	SVG_Layer_destroy( ZL );
 
 	//cpSpaceSetGravity( space, cpv(0, 10) );
 	
 
 	//SDL_Log( "done.\n now loading Holo layer" );
-	SVG_Layer *HL = svg_load_layer( f, "Holo" );
+	//SVG_Layer *HL = svg_load_layer( f, "Holo" );
 
 	SDL_CloseIO( f );
 
@@ -770,7 +866,8 @@ void upon_a_sphere( SDL_Renderer *R, GameState *GS, char *spherepath ){
 			goto end;
 		}
 		
-		update_camera( &T, p1pos );
+		update_camera( &T, p1pos, &world_angle );
+		Mat23 WT = T.M;
 
 		SDL_SetRenderDrawColor( R, 2, 2, 2, 255 );
 		SDL_RenderClear( R );
@@ -802,9 +899,9 @@ void upon_a_sphere( SDL_Renderer *R, GameState *GS, char *spherepath ){
 
 				/* Draw exhaust visuals */
 				draw_Geo_Animation( R, &(ships[s]->data->exhaust), 
-				                    &(ships[s]->exh_frame), 
-				                    &(ships[s]->exh_timer),
-                         		    &T, vbuf );
+				                       &(ships[s]->exh_frame), 
+				                       &(ships[s]->exh_timer),
+                         		       &T, vbuf );
 				/* Create smoke */
 				OBJ *slot = fresh_OBJ_slot( &PUFFOBJS );
 				cpVect svel = cpvmult( cpBodyGetVelocity( ships[s]->body ), 0.5 );
@@ -816,7 +913,7 @@ void upon_a_sphere( SDL_Renderer *R, GameState *GS, char *spherepath ){
 				ships[s]->thrusting = false;
 			}
 		}
-		update_camera( &T, p1pos );// reset for next step
+		T.M = WT;// reset for next step
 
 		// -- Smoke FX -- 
 		SDL_SetRenderTarget( R, puff_mask );
@@ -851,6 +948,9 @@ void upon_a_sphere( SDL_Renderer *R, GameState *GS, char *spherepath ){
 
 		SDL_SetRenderDrawColor( R, 100, 255, 240, 255 );
 		SDL_framerate_limit_n_monitor( R, 17 );
+		char buf [256];
+		SDL_snprintf( buf, sizeof(buf), "%lg, %lg", xy(p1pos) );
+	    SDL_RenderDebugText(R, 20, 40, buf);
 
 		SDL_RenderPresent(R);
 		
@@ -886,7 +986,7 @@ void among_the_stars( SDL_Renderer *R, GameState *GS, char *starspath ){
 	float min_scaleI = 0;
 	update_TM( &T, 0, 0, 0, 0 );
 
-	SDL_Log( "going among \"%s\"", starspath );
+	//SDL_Log( "going among \"%s\"", starspath );
 	SDL_IOStream *f = SDL_IOFromFile( starspath, "r" );
 
 	SVG_Layer *CL = svg_load_layer( f, "Cosmos" );

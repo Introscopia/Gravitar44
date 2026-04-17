@@ -1706,11 +1706,11 @@ bool cursor_in_rect( SDL_Event *event, SDL_Rect *R ){
 	}
 }
 
-bool coordinates_in_Rect( float x, float y, SDL_Rect *R ){
-	return ( x > R->x && x < R->x + R->w ) && ( y > R->y && y < R->y + R->h );
+inline bool coordinates_in_Rect( float x, float y, SDL_Rect R ){
+	return x > R.x && x < R.x + R.w && y > R.y && y < R.y + R.h;
 }
-bool coordinates_in_FRect( float x, float y, SDL_FRect *R ){
-	return ( x > R->x && x < R->x + R->w ) && ( y > R->y && y < R->y + R->h );
+inline bool coordinates_in_FRect( float x, float y, SDL_FRect R ){
+	return x > R.x && x < R.x + R.w && y > R.y && y < R.y + R.h;
 }
 bool SDL_Rect_overlap( SDL_Rect *A, SDL_Rect *B ){
 	return ( ( A->x + A->w > B->x ) && ( B->x + B->w > A->x ) ) && ( ( A->y + A->h > B->y ) && ( B->y + B->h > A->y ) );
@@ -2016,8 +2016,6 @@ void SDL_framerate_limit_n_monitor(SDL_Renderer *R, int frame_period) {
     char buf[64];
     float idle_pct = ((frame_period - avg) / frame_period ) * 100.0;
     SDL_snprintf( buf, sizeof(buf), "%.1f fps (%+.1f%%) f:%d", fps, idle_pct, elapsed );
-
-    SDL_SetRenderDrawColor(R, 0, 255, 100, 255);
     SDL_RenderDebugText(R, 20, 20, buf);
 }
 

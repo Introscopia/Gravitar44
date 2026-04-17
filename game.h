@@ -95,6 +95,12 @@ void load_doodads( char *filename, Library *lib );
 
 
 
+typedef void (*world_bounding_func)( void *W, cpBody *b );
+typedef void (*update_camera_func)( Transform *T, cpVect target, double *world_angle );
+typedef void (*render_world_func)( SDL_Renderer *R, void *W, Styled_Geo *map_visuals, Transform *T, SDL_FPoint *vbuf );
+typedef void (*gravitate_func)( void *W, cpBody *body, double force );
+typedef bool (*inside_func)( void *W, cpVect p );
+
 typedef struct{
 
 	SDL_FRect bounds;
@@ -110,22 +116,16 @@ typedef struct{
 
 } flat_world;
 
-void init_flat_world( void **W, SDL_FRect bounds, Styled_Geo *map_visuals, int width );
+typedef struct{
 
-typedef void (*world_bounding_func)( void *W, cpBody *b );
-void flat_world_bounding( void *W, cpBody *b );
+	double bounds; //radius
+	double bounds_sq;
+	double surface_rad;
+	double surface_radsq;
+	double surface_radcubed;
 
-typedef void (*update_camera_func)( Transform *T, cpVect target );
-void flat_world_update_camera( Transform *T, cpVect target );
 
-typedef void (*render_world_func)( SDL_Renderer *R, void *W, Styled_Geo *map_visuals, Transform *T, SDL_FPoint *vbuf );
-void render_flat_world( SDL_Renderer *R, void *W, Styled_Geo *map_visuals, Transform *T, SDL_FPoint *vbuf );
-
-typedef void (*gravitate_func)( void *W, cpBody *body, double force );
-void flat_world_gravitate( void *W, cpBody *body, double force );
-
-typedef bool (*inside_func)( void *W, cpVect p );
-bool inside_flat_world( void *W, cpVect p );
+} round_world;
 
 
 typedef enum { THRUST, REVTHRUST, SHIELD, GRAB, DROP, FIRE1, FIRE2, UI_YES, UI_BACK, PAUSE } ctrl_verb;

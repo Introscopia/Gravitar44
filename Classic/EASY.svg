@@ -150,7 +150,6 @@
      style="display:none"
      gravity="24"
      time_factor="12"
-     background_color="020202FF"
      inertia="1"
      SleepTimeThreshold="3000">
      <path
