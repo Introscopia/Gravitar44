@@ -1772,6 +1772,20 @@ void fit_frect( SDL_FRect *A, SDL_FRect *B ){
 	}
 }
 
+void constrain_frect( SDL_FRect *A, const SDL_FRect B ){
+	if( A->w > B.w ){
+		A->h = (A->h * B.w) / A->w;
+		A->w = B.w;
+	}
+	if( A->h > B.h ){
+		A->w = (A->w * B.h) / A->h;
+		A->h = B.h;
+	}
+	if( A->x < B.x ) A->x = B.x;
+	if( A->x + A->w > B.x + B.w ) A->x = B.x + B.w - A->w;
+	if( A->y < B.y ) A->y = B.y;
+	if( A->y + A->h > B.y + B.h ) A->y = B.y + B.h - A->h;
+}
 
 
 /*

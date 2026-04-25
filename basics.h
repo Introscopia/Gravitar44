@@ -270,6 +270,8 @@ SDL_Rect add_rects( SDL_Rect *A, SDL_Rect *B);
 void fit_rect( SDL_Rect *A, SDL_Rect *B );
 void fit_frect( SDL_FRect *A, SDL_FRect *B );
 
+void constrain_frect( SDL_FRect *A, const SDL_FRect B );
+
 
 Uint32 char4_to_int( char str [4] );
 void int_to_char4( Uint32 N, char str [4] );

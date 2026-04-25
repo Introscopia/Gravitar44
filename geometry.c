@@ -95,6 +95,23 @@ bool Lineseg_intersection(Lineseg LS1, Lineseg LS2, vec2d *intersection){
 	return 0;
 }
 
+bool point_in_path(vec2d p, const Path *path){
+    if (!path || path->N < 3) return false;
+    int crossings = 0;
+    for (int i = 0; i < path->N; ++i) {
+        vec2d a = path->verts[i];
+        vec2d b = path->verts[(i + 1) % path->N];
+        if ((a.y > p.y) != (b.y > p.y)) { // does edge straddle p vertically
+            float x_intersect = a.x + (b.x - a.x) * (p.y - a.y) / (b.y - a.y);
+            if (x_intersect > p.x) {
+                crossings++;
+            }
+        }
+    }
+    return (crossings & 1) != 0;
+}
+
+
 
 // source: http://rosettacode.org/wiki/Sutherland-Hodgman_PathBgon_clipping#C
  
@@ -275,6 +292,49 @@ vec2d geo_centralize( Geometric *geo ){
 	vec2d c = geo_centroid(geo);
 	geo_offset( geo, v2d_neg(c) );
 	return c;
+}
+
+
+
+vec2d random_point_in_geo(Geometric *geo) {
+    vec2d result = (vec2d){0.0f, 0.0f};
+    if (!geo) return result;
+
+    switch (geo->type) {
+        case geo_CIRCLE: {
+            float angle = random_angle();
+            float radius = geo->u.circle.radius * SDL_sqrtf( SDL_randf() );
+            result = (vec2d){ geo->u.circle.pos.x + radius * SDL_cosf(angle),
+                              geo->u.circle.pos.y + radius * SDL_sinf(angle) };
+        } break;
+
+        case geo_BOX: {
+            result = (vec2d){ geo->u.box.x + SDL_randf() * geo->u.box.w,
+                              geo->u.box.y + SDL_randf() * geo->u.box.h };
+        } break;
+
+        case geo_PATH: {
+            const Path *p = &geo->u.path;
+            SDL_Rect bb = geo_bb(geo);
+
+            const int MAX_ATTEMPTS = 24;
+            int a;
+            for (a = 0; a < MAX_ATTEMPTS; ++a) {
+                vec2d test = {
+                    bb.x + SDL_randf() * bb.w,
+                    bb.y + SDL_randf() * bb.h
+                };
+                if (point_in_path(test, p)) {
+                    result = test;
+                    break;
+                }
+            }
+            if (a == MAX_ATTEMPTS) {
+                result = Path_centroid(p);
+            }
+        } break;
+    }
+    return result;
 }
 
 

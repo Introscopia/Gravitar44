@@ -128,6 +128,19 @@ SDL_FRect reverse_transform_frect( SDL_FRect *rct, Transform *T ){
 }
 
 
+void constrain_Transform( Transform *T, SDL_FRect window_rct, SDL_FRect bounds ){
+
+    SDL_FRect dst = apply_transform_frect( &window_rct, T );
+    float pw = dst.w;
+    constrain_frect( &dst, bounds );
+
+    T->s *= dst.w / pw;
+    T->invs = 1.0 / T->s;
+    T->tx = -(dst.x - T->cx) * T->invs;
+    T->ty = -(dst.y - T->cy) * T->invs;
+}
+
+
 
 vec2d apply_Mat23_v2d( vec2d world, const Mat23 *M ) {
     return (vec2d){

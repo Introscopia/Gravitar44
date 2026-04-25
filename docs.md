@@ -32,6 +32,22 @@
    * smoke -- should be a <circle>. where smoke particles spawn when the ship is thrusting.
   Ships
 
+# MAPS
+  > Layers:
+   - Zones
+     - <bounds> geo with this id will determine the bounds of the map.
+       A rect will designate this as a FLAT map: gravity points down.
+       A circle will designate this as a ROUND map: gravity points towards the origin.
+       > attributes:
+         - <camera>: can be set to "FIXED", which disables rotating camera in round maps.
+     - <gravity_falloff>
+     - <spawn>: area where ship will appear upon entering the map.
+   - Visual
+   - Physical
+     > attributes:
+       - <gravity>: numerical value, strength of gravity. note that values differ hugely between round and flat maps.
+   - Holo
+
 ## Glossary
  * "geo" in an svg: a <path>, a <circle> or a <rect>.
  	<path>s may not have subpaths!!

@@ -488,7 +488,7 @@
      id="layer3"
      inkscape:label="Physical"
      style="display:inline"
-     gravity="40000000">
+     gravity="35000000">
     <path
        style="fill:#9cdbee;fill-opacity:0.6;stroke:#9cdbee;stroke-linejoin:round;stroke-opacity:1;paint-order:markers fill stroke"
        d="m -377.7332,-501.93864 96.00006,-95.99993 127.99994,128 -128,63.99993 z"
@@ -586,7 +586,8 @@
        id="bounds"
        cy="0"
        cx="0"
-       r="1665" />
+       r="1665"
+       camera="FIXED" />
     <circle
        style="fill:#9c9c9c;fill-opacity:0.316854;stroke:none;stroke-linejoin:round;stroke-opacity:1;paint-order:markers fill stroke"
        id="gravity_falloff"

@@ -59,8 +59,7 @@ int main(int argc, char *argv[]){
 	
 	GameState GS;
 
-	GS.width = width;
-	GS.height = height;
+	GS.window_rct = (SDL_FRect){ 0, 0, width, height };
 	GS.cx = cx;
 	GS.cy = cy;
 

@@ -53,6 +53,8 @@ SDL_Rect reverse_transform_rect( SDL_Rect *rct, Transform *T );
 SDL_FRect apply_transform_frect( SDL_FRect *rct, Transform *T );
 SDL_FRect reverse_transform_frect( SDL_FRect *rct, Transform *T );
 
+void constrain_Transform( Transform *T, SDL_FRect window_rct, SDL_FRect bounds );
+
 
 vec2d apply_Mat23_v2d( vec2d world, const Mat23 *M );
 

@@ -90,6 +90,10 @@ vec2d geo_centroid( Geometric *geo );
 
 vec2d geo_centralize( Geometric *geo ); //returns the centroid
 
+bool point_in_path(vec2d p, const Path *path);
+
+vec2d random_point_in_geo(Geometric *geo);
+
 void Path_rotate( Path *path, double angle );
 
 PathB* PathB_new();

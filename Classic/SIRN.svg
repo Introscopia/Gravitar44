@@ -23,8 +23,8 @@
      showgrid="false"
      showborder="false"
      inkscape:zoom="0.10429825"
-     inkscape:cx="1927.1656"
-     inkscape:cy="-1198.4861"
+     inkscape:cx="2094.9537"
+     inkscape:cy="-786.20686"
      inkscape:window-width="1366"
      inkscape:window-height="697"
      inkscape:window-x="-8"
@@ -359,7 +359,7 @@
      id="layer3"
      inkscape:label="Physical"
      style="display:inline"
-     gravity="400000000">
+     gravity="28">
     <path
        style="font-style:normal;font-weight:normal;font-size:12px;font-family:Dialog;color-interpolation:auto;fill:#ecffff;fill-opacity:0.396057;stroke:#ecffff;stroke-width:1;stroke-linecap:square;stroke-linejoin:round;stroke-miterlimit:10;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;paint-order:markers fill stroke;color-rendering:auto;image-rendering:auto;shape-rendering:auto;text-rendering:auto"
        d="M 0,0 -204,640 H 232.5063 L 160,256 64,0 Z"
@@ -453,7 +453,7 @@
        style="font-style:normal;font-weight:normal;font-size:12px;font-family:Dialog;display:inline;color-interpolation:auto;fill:#ecffff;fill-opacity:0.189964;stroke:#ecffff;stroke-width:1;stroke-linecap:square;stroke-linejoin:round;stroke-miterlimit:10;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;paint-order:markers fill stroke;color-rendering:auto;image-rendering:auto;shape-rendering:auto;text-rendering:auto"
        id="bounds"
        width="4085"
-       height="2140.5044"
+       height="1903.2163"
        x="0"
        y="-1500.5045" />
     <rect
@@ -462,7 +462,7 @@
        width="4085"
        height="1638.1266"
        x="0"
-       y="-2986.6272" />
+       y="-2766.1057" />
   </g>
   <g
      inkscape:groupmode="layer"
