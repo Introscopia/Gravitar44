@@ -21,7 +21,7 @@ cpVect cpv_rottrig( cpVect v, vec2d trig ){
 
 /*	...code_alphabetical_bit...
 	a
-	b - 
+	b - bullets
 	c - 
 	d - 
 	e - Exhaust, effects
@@ -39,7 +39,7 @@ cpVect cpv_rottrig( cpVect v, vec2d trig ){
 	q - 
 	r - 
 	s - Solid, static
-	t - 
+	t - terrain
 	u - 
 	v - Vessels
 	w - 
@@ -342,7 +342,7 @@ int SVG_layer_into_cpSpace( SVG_Layer *layer, cpSpace *space, bool physical_stro
 
 		cpShapeSetCollisionType( shape, pr.collisionType );
 		if( pr.categories == CP_ALL_CATEGORIES ){
-			if( pr.behavior == 's' ) pr.categories = de_mask( "s" );
+			if( pr.behavior == 's' ) pr.categories = de_mask( "st" );
 		}
 		cpShapeFilter filter = cpShapeFilterNew( pr.group, pr.categories, pr.mask );
 		cpShapeSetFilter( shape, filter );
@@ -358,15 +358,40 @@ int SVG_layer_into_cpSpace( SVG_Layer *layer, cpSpace *space, bool physical_stro
 }
 
 
+int empty_obj_func( OBJ *O ){ return 0; }
 
-int age_and_pass_away( OBJ *O ){
-
-	int *age = (int*)(O->data);
-	*age -= 1;
-	if( *age < 0 ){
+int ageing_body_tick( OBJ *O ){
+	ageing_body* ab = (ageing_body*)(O->data);
+	ab->age -= 1;
+	if( ab->age < 0 ){
 		return 1;
 	}
 	return 0;
+}
+
+int destroy_ageing_body( OBJ *O ){
+	ageing_body* ab = (ageing_body*)(O->data);
+	if( cpDestroyBody_and_its_shapes( ab->body ) <= 0 ){
+		// send it to heck so it clears any interactions it was having...
+		cpBodySetPosition( ab->body, cpv( -999999 - SDL_rand(999999), -999999 - SDL_rand(999999) ) );
+		return 0;
+	}
+	return 1;
+}
+
+int styled_body_tick( OBJ *O ){
+	styled_body *sb = (styled_body*)(O->data);
+	return sb->status;
+}
+
+int destroy_styled_body( OBJ *O ){
+	styled_body *sb = (styled_body*)(O->data);
+	if( cpDestroyBody_and_its_shapes( sb->body ) <= 0 ){
+		// send it to heck so it clears any interactions it was having...
+		cpBodySetPosition( sb->body, cpv( -999999 - SDL_rand(999999), -999999 - SDL_rand(999999) ) );
+		return 0;
+	}
+	return 1;
 }
 
 
@@ -380,7 +405,7 @@ void init_OBJ_Page( OBJ_Page *OP ){
 }
 
 OBJ *fresh_OBJ_slot( OBJ_Page *OP ){
-	restart_fresh:
+	restart:
 	while( OP->full ){
 		if( OP->next == NULL ){
 			OP->next = SDL_malloc( sizeof(OBJ_Page) );
@@ -388,46 +413,37 @@ OBJ *fresh_OBJ_slot( OBJ_Page *OP ){
 		}
 		OP = OP->next;
 	}
-	if( OP->objs[ OP->index ].body != NULL ){
+	if( OP->objs[ OP->index ].type > 0 ){
 		int n = cycle( OP->index + 1, 0, OBJ_PAGE_SIZE-1 );
 		if( n == OP->oldest ){
 			OP->full = 1;
-			goto restart_fresh;
+			goto restart;
 		}
 		OP->index = n;
 	}
 	return OP->objs + OP->index;
-	/*
-	while (1) {
-        // find a page that isn't full
-        while( OP->full ){
-            if (OP->next == NULL) {
-                OP->next = SDL_malloc(sizeof(OBJ_Page));
-                init_OBJ_Page(OP->next);
-            }
-            OP = OP->next;
-        }
-
-        // find a fresh slot
-        if (OP->objs[OP->index].body == NULL) {
-            OP->index = cycle(OP->index + 1, 0, OBJ_PAGE_SIZE - 1);
-            return OP->objs + OP->index;
-        }
-
-        // keep looking
-        int n = cycle(OP->index + 1, 0, OBJ_PAGE_SIZE - 1);
-        if (n == OP->oldest) {
-            OP->full = 1; // page is full
-        } else {
-            OP->index = n;
-        }
-    }
-    */
 }
 
 
+void OBJ_expired( OBJ_Page *OP, int i ){
+	if( OP->objs[i].destroy( OP->objs + i ) ){
+		SDL_free( OP->objs[i].data );
+		OP->objs[i].data = NULL;
+		OP->objs[i].type = 0;
+		OP->full = 0;
+		if( OP->oldest == i || OP->objs[OP->oldest].type <= 0 ){
+			do{
+				OP->oldest = cycle( OP->oldest+1, 0, OBJ_PAGE_SIZE-1 );
+				if( OP->oldest == OP->index ) break;
+			} while ( OP->objs[ OP->oldest ].type <= 0 );
+		}
+	}
+}
+
+
+
 bool cpDestroyBody_and_its_shapes(cpBody *body){
-	if(body){
+	if( body ){
 		if( body->arbiterList ) return 0;
 		cpShape *shape = body->shapeList;
 		while( shape ){
@@ -442,27 +458,6 @@ bool cpDestroyBody_and_its_shapes(cpBody *body){
 	}
 	return 0;
 }
-
-
-void OBJ_expired( OBJ_Page *OP, int i ){
-	if( cpDestroyBody_and_its_shapes( OP->objs[i].body ) ){
-		//cpSpaceRemoveBody( space, OP->objs[i].body );
-		OP->objs[i].body = NULL;
-		SDL_free( OP->objs[i].data );
-		OP->objs[i].data = NULL;
-		OP->full = 0;
-		if( OP->oldest == i || OP->objs[OP->oldest].body == NULL ){
-			do{
-				OP->oldest = cycle( OP->oldest+1, 0, OBJ_PAGE_SIZE-1 );
-				if( OP->oldest == OP->index ) break;
-			} while( OP->objs[OP->oldest].body == NULL );
-		}
-	}
-	else{// send it to heck so it clears any interactions it was having...
-		cpBodySetPosition( OP->objs[i].body, cpv( -999999 - SDL_rand(999999), -999999 - SDL_rand(999999) ) );
-	}
-}
-
 
 
 

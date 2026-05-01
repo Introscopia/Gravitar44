@@ -11,6 +11,12 @@
 #include "input.h"
 
 
+enum types_of_stuff { EMPTY, TERRAIN, ROCK, SHIP, BUILDING,
+			          SMOKE, BULLET, DEBRIS, PARTICLE, 
+			          FUEL, REPAIR_PACK, POWERUP };
+
+
+
 #define exh_frame_cycle 5
 
 typedef struct ship_data_struct{
@@ -62,7 +68,7 @@ typedef struct {
 
 	char name [64];
 
-	enum { EMPTY, SHIP, BOMB, ITEM, GATE, PARTICULARS } type;
+	int type; //types of stuff
 
 	union {
 
@@ -92,7 +98,6 @@ typedef struct {
 } Library;
 
 void load_doodads( char *filename, Library *lib );
-
 
 
 typedef void (*world_bounding_func)( void *W, cpBody *b );
@@ -128,7 +133,7 @@ typedef struct{
 } round_world;
 
 
-typedef enum { THRUST, REVTHRUST, SHIELD, GRAB, DROP, FIRE1, FIRE2, UI_YES, UI_BACK, PAUSE } ctrl_verb;
+typedef enum { THRUST, REVTHRUST, SHIELD, GRAB, DROP, FIRE_A, FIRE_B, UI_YES, UI_BACK, PAUSE } ctrl_verb;
 
 typedef void (*pilot_func)( Ship_inst*, vec2d, vec2d, double );
 void pilot_YAWER( Ship_inst *S, vec2d pilot_vec, vec2d prev_pilot_vec, double delta_time );

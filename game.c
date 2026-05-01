@@ -64,7 +64,9 @@ void load_doodads( char *filename, Library *lib ){
 	L->styles = NULL;
 
 	Hashmap class_map;
-	new_hashmap( &class_map, 2, 3, "ship", "bomb", "item" );
+	new_hashmap( &class_map, 1, 12, "empty", "terrain", "rock", "ship", "building",
+			          			    "smoke", "bullet", "debris", "particle",  "fuel", 
+			          			    "repair_pack", "powerUp" );
 	Hashmap doodelements_map;//                0         1        2        3        4
 	new_hashmap( &doodelements_map, 1, 5, "physical", "visual", "exhaust", "center", "smoke" );
 	Hashmap ship_attribs_map;
@@ -274,7 +276,7 @@ void init_ship_physics( Ship_inst *ship, cpSpace *space, cpVect pos ){
 		cpShapeSetDensity( shape, ship->data->properties[p].density );
 		cpShapeSetFriction( shape, ship->data->properties[p].friction );
 		cpShapeSetElasticity( shape, ship->data->properties[p].elasticity );
-		cpShapeFilter filter = cpShapeFilterNew( 0, de_mask( "v" ), de_mask( "vs" ) );
+		cpShapeFilter filter = cpShapeFilterNew( 0, de_mask( "v" ), de_mask( "bvst" ) );
 		cpShapeSetFilter( shape, filter );
 	}
 	/*SDL_Log( "ship mass: %g", cpBodyGetMass( ship->body ) );
@@ -562,17 +564,17 @@ bool inside_round_world( void *W, cpVect p ){
 
 
 // ps: puffscale
-void create_smokepuff( cpSpace *space, OBJ *O, float ps, cpVect pos, cpVect vel, Library *lib ){
+void create_smokepuff( cpSpace *space, OBJ *O, float ps, cpVect pos, cpVect vel ){
 
-	O->body = cpSpaceAddBody( space, cpBodyNew(0, 0) );
-	cpBodySetPosition( O->body, pos );
+	cpBody *body = cpSpaceAddBody( space, cpBodyNew(0, 0) );
+	cpBodySetPosition( body, pos );
 	double vm = cpvlength(vel);
 	double va = cpvtoangle(vel);
 	va += randomF( -0.25, 0.25 );
 	vel = cpv_polar( vm, va );
-	cpBodySetVelocity( O->body, vel );
-	cpBodySetAngle( O->body, random_angle() );
-	//cpShape *shape = cpCircleShapeNew( O->body, 5, cpvzero );
+	cpBodySetVelocity( body, vel );
+	cpBodySetAngle( body, random_angle() );
+	//cpShape *shape = cpCircleShapeNew( body, 5, cpvzero );
 	// equilateral triangle, circumradius=4
 	cpVect points [3] = { cpv( ps *  1.5,        0 ), 
 						  cpv( ps * -0.75, ps *  2.25 / SQRT3 ), 
@@ -581,22 +583,53 @@ void create_smokepuff( cpSpace *space, OBJ *O, float ps, cpVect pos, cpVect vel,
 		points[v] = cpvadd( points[v], cpv_polar( 0.5, random_angle() ) );
 	}
 	void *shape = cpPolyShapeAlloc();
-	cpPolyShapeInitRaw( shape, O->body, 3, points, 0.0 );
-	cpBodySetVelocityUpdateFunc( O->body, cpBodyUpdateVelocity_NoGravity );
+	cpPolyShapeInitRaw( shape, body, 3, points, 0.0 );
+	cpBodySetVelocityUpdateFunc( body, cpBodyUpdateVelocity_NoGravity );
 	cpSpaceAddShape( space, shape );
 	cpShapeSet_DEF( shape, 0.001, 0.8, 0.04 );
-	cpShapeFilter filter = cpShapeFilterNew( 0, de_mask( "e" ), de_mask( "es" ) );
+	cpShapeFilter filter = cpShapeFilterNew( 0, de_mask( "e" ), de_mask( "est" ) );
 	cpShapeSetFilter( shape, filter );
+	cpShapeSetCollisionType( shape, SMOKE );
 	cpShapeSetUserData( shape, (cpDataPointer)O );
 
-	//int v = SDL_rand( vec_size( lib->doodads[ lib->smokepuffs ].u.visuals ) );
-	//vec_copy( O->visual, lib->doodads[ lib->smokepuffs ].u.visuals[v] );
-
-	O->data = SDL_calloc( 1, sizeof(int) );// the age of the puff.
-	int *age = (int*)(O->data);
-	*age = randomI( 35, 50 );
-	O->tick = age_and_pass_away;
+	O->type = SMOKE;
+	O->data = SDL_calloc( 1, sizeof(ageing_body) );
+	ageing_body* ab = (ageing_body*)(O->data);
+	ab->body = body;
+	ab->age = randomI( 35, 50 );
+	O->tick = ageing_body_tick;
+	O->destroy = destroy_ageing_body;
 }
+
+void create_bullet( cpSpace *space, OBJ *O, cpVect pos, cpVect vel, double heading, Style *style ){
+	//putchar('{');
+	cpBody *body = cpSpaceAddBody( space, cpBodyNew(0, 0) );
+	cpBodySetPosition( body, pos );
+	cpBodySetVelocity( body, vel );
+	cpBodySetAngle( body, heading );
+	//cpBodySetAngularVelocity( body, TWO_PI );
+
+	void *shape = cpSegmentShapeNew( body, cpv(-5,0), cpv(5,0), 0.5 );
+	cpSpaceAddShape( space, shape );
+	cpShapeSetDensity( shape, 0.07 );
+	cpShapeSetElasticity( shape, 0.66 );
+	cpShapeSetFriction( shape, 0.04 );
+	cpShapeFilter filter = cpShapeFilterNew( 0, de_mask( "b" ), de_mask( "stv" ) );
+	cpShapeSetFilter( shape, filter );
+	cpShapeSetCollisionType( shape, BULLET );
+	cpShapeSetUserData( shape, (cpDataPointer)O );
+	
+	O->type = BULLET;
+	O->data = SDL_calloc( 1, sizeof(styled_body) );
+	styled_body* sb = (styled_body*)(O->data);
+	sb->body = body;
+	sb->style = style;
+	sb->status = 0;
+	O->tick = styled_body_tick;
+	O->destroy = destroy_styled_body;
+}
+
+
 
 
 
@@ -625,7 +658,7 @@ void upon_a_sphere( SDL_Renderer *R, GameState *GS, char *spherepath ){
 	
 	update_camera_func update_camera = NULL;
 	m_update_func camera_matrix = NULL;
-	voidptr_func destroy_world = NULL;
+	procedure destroy_world = NULL;
 
 	double grav_max = 0;
 
@@ -775,8 +808,14 @@ void upon_a_sphere( SDL_Renderer *R, GameState *GS, char *spherepath ){
 
 	//SDL_Log( "puffs: %p, puff_dims.h: %d", GS->lib.puffs, GS->lib.puff_dims.h );
 
-	SDL_Texture *smokey_texture = SDL_CreateTexture( R, SDL_PIXELFORMAT_RGBA8888,
-                                                     SDL_TEXTUREACCESS_TARGET, GS->window_rct.w, GS->window_rct.h );
+
+	OBJ_Page OBJS;
+	init_OBJ_Page( &OBJS );
+
+
+	SDL_Surface *smosurf = SDL_LoadPNG( "Classic/wavies.png" );
+	SDL_Texture *smokey_texture = SDL_CreateTextureFromSurface( R, smosurf );
+	SDL_DestroySurface( smosurf );
 
     SDL_Texture *puff_mask = SDL_CreateTexture( R, SDL_PIXELFORMAT_RGBA8888,
                                                 SDL_TEXTUREACCESS_TARGET, GS->window_rct.w, GS->window_rct.h );
@@ -784,23 +823,27 @@ void upon_a_sphere( SDL_Renderer *R, GameState *GS, char *spherepath ){
     SDL_Texture *smoke_target = SDL_CreateTexture( R, SDL_PIXELFORMAT_RGBA8888,
                                                    SDL_TEXTUREACCESS_TARGET, GS->window_rct.w, GS->window_rct.h );
 
-    SDL_SetRenderTarget( R, smokey_texture );
-	SDL_SetRenderDrawColor( R, 0, 0, 0, 0 );
-	SDL_RenderClear( R );
-	SDL_SetRenderDrawColor( R, 255, 255, 255, 255 );
-	for (int y = 0; y < GS->window_rct.h; y += 8 ){
-		SDL_RenderLine( R, 0, y, GS->window_rct.w, y );
-		//gp_draw_24circle( R, GS->cx, GS->cy, y );
-	}
-	SDL_SetRenderTarget( R, NULL );
-
-	OBJ_Page PUFFOBJS;
-	init_OBJ_Page( &PUFFOBJS );
+    /*SDL_SetRenderTarget( R, smokey_texture );
+	  SDL_SetRenderDrawColor( R, 0, 0, 0, 0 );
+	  SDL_RenderClear( R );
+	  SDL_SetRenderDrawColor( R, 255, 255, 255, 255 );
+	  for (int y = 0; y < GS->window_rct.h; y += 8 ){
+	  	//SDL_RenderLine( R, 0, y, GS->window_rct.w, y );
+	  	gp_draw_circle( R, GS->cx, GS->cy * 0.25, y );
+	  }
+	  SDL_SetRenderTarget( R, NULL );*/
 
 	float puffscale = 1;
 	Circle circumship0 = circumscribe_Path( &(ships[0]->data->physical[0].u.path) );
 	puffscale = circumship0.radius / 3.5; //heuristic!
 
+	Style bullet_style = { .stroke = 1,
+						   .stroke_color = Uint32_to_SDL_Color( 0xFFFF00FF ),
+						   .stroke_width = 1,
+						   .fill = 0,
+						   .fill_color = 0,
+						};
+	
 
 	int longest_path = 0;
 	for (int i = 0; i < vec_size(map_visuals); ++i ){
@@ -838,6 +881,10 @@ void upon_a_sphere( SDL_Renderer *R, GameState *GS, char *spherepath ){
 			//UI_event_handling_function( &main_menu, &event );
 
 			int captured = Dir_HandleEvent( &event, &(GS->flightstick), GS->cx, GS->cy );
+
+			for (int i = 0; i < 10; ++i ){
+				captured += HandleEvent( &event, GS->controls + i, GS->cx, GS->cy );
+			}
 
 			if( !captured ){
 				switch (event.type) {
@@ -887,6 +934,17 @@ void upon_a_sphere( SDL_Renderer *R, GameState *GS, char *spherepath ){
 			}
 		}
 
+		cpVect p1pos = cpBodyGetPosition( ships[0]->body );
+
+		if( GS->controls[ FIRE_A ].current ){
+			OBJ *slot = fresh_OBJ_slot( &OBJS );
+			double heading = cpBodyGetAngle( ships[0]->body ) - HALF_PI;
+			cpVect trig = cpvforangle( heading );
+			cpVect pos = cpvadd( p1pos, cpvmult( cpvrotate( cpv(1,0), trig ), circumship0.radius ) ); 
+			cpVect vel = cpvadd( cpBodyGetVelocity( ships[0]->body ), cpvmult( trig, 350 ) );
+			create_bullet( space, slot, pos, vel, heading, &bullet_style );
+		}
+
 
 		vec2d pilot_vec = DirInput_compute( &(GS->flightstick) );
 
@@ -909,7 +967,7 @@ void upon_a_sphere( SDL_Renderer *R, GameState *GS, char *spherepath ){
 
 		prev_pilot_vec = pilot_vec;
  
-		cpVect p1pos = cpBodyGetPosition( ships[0]->body );
+		p1pos = cpBodyGetPosition( ships[0]->body );
 		//SDL_Log("p1pos: %lg, %lg\n", xy(p1pos) );
 
 		if( !inside( world_data, p1pos ) ){
@@ -956,36 +1014,54 @@ void upon_a_sphere( SDL_Renderer *R, GameState *GS, char *spherepath ){
 				                       &(ships[s]->exh_timer),
                          		       &T, vbuf );
 				/* Create smoke */
-				OBJ *slot = fresh_OBJ_slot( &PUFFOBJS );
+				OBJ *slot = fresh_OBJ_slot( &OBJS );
 				cpVect svel = cpvmult( cpBodyGetVelocity( ships[s]->body ), 0.5 );
 				cpVect exhvel = cpv_rottrig( cpv( 0, puffscale * 32 ), trig );//v2d_rotate( cpv( 0, 32 ), sheading ); //cpBodyLocalToWorld( ships[s]->body, cpv( 0, 32 ) );
 				cpVect vel = cpvadd( svel, exhvel );
 				cpVect pos = cpBodyLocalToWorld( ships[s]->body, ships[s]->data->smoke_outlet );
-				create_smokepuff( space, slot, puffscale, pos, vel, &(GS->lib) );
+				create_smokepuff( space, slot, puffscale, pos, vel );
 
 				ships[s]->thrusting = false;
 			}
 		}
 		T.M = WT;// reset for next step
 
-		// -- Smoke FX -- 
-		SDL_SetRenderTarget( R, puff_mask );
+		// -- Objects tick -- 
 
-		OBJ_Page *OP = &PUFFOBJS;
+		OBJ_Page *OP = &OBJS;
 		do{
 			int i = OP->oldest;
-			for (int c = 0; c < OBJ_PAGE_SIZE; ++c ){
+			for( int c = 0; c < OBJ_PAGE_SIZE; ++c ){
 
-				if( OP->objs[i].body != NULL ){
-					cpVect obpos = cpBodyGetPosition( OP->objs[i].body );
-					int *age = (int*)(OP->objs[i].data);
-					SDL_SetRenderDrawColor( R, 255, 255, 255, constrain(map(*age, 0, 35, 0, 255), 0, 255) );
-					TM_APPLY_TO( obpos, obpos, T.M );
-					gp_fill_8circle( R, obpos.x, obpos.y, T.s * 1.8 * puffscale );
+				switch( OP->objs[i].type ){
 
-					if( OP->objs[i].tick( OP->objs + i ) ){
-						OBJ_expired( OP, i );
-					}
+					case SMOKE:{
+						ageing_body* ab = (ageing_body*)(OP->objs[i].data);
+						cpVect obpos = cpBodyGetPosition( ab->body );
+						SDL_SetRenderTarget( R, puff_mask );
+						SDL_SetRenderDrawColor( R, 255, 255, 255, 
+							                    constrain( map(ab->age, 0, 35, 0, 255), 0, 255) );
+						TM_APPLY_TO( obpos, obpos, T.M );
+						gp_fill_8circle( R, obpos.x, obpos.y, T.s * 1.8 * puffscale );
+						SDL_SetRenderTarget( R, NULL );
+
+						if( OP->objs[i].tick( OP->objs + i ) ){
+							OBJ_expired( OP, i );
+						}
+						} break;
+
+					case BULLET:{
+						styled_body *sb = (styled_body*)(OP->objs[i].data);
+						SDL_SetRenderDraw_SDL_Color( R, sb->style->stroke_color );
+						stroke_cpBody( R, sb->body, &T ); 
+						} break;
+
+					case DEBRIS: 
+					case ROCK: 
+					case PARTICLE: 
+					case FUEL: 
+					case REPAIR_PACK: 
+					case POWERUP: 
 				}
 
 				if( i == OP->index ) break;
@@ -1020,6 +1096,10 @@ void upon_a_sphere( SDL_Renderer *R, GameState *GS, char *spherepath ){
 	vec_delete( visual_styles );
 	
 	SDL_free( vbuf );
+
+	SDL_DestroyTexture(smokey_texture);
+	SDL_DestroyTexture(puff_mask);
+	SDL_DestroyTexture(smoke_target);
 }
 
 
@@ -1101,7 +1181,7 @@ void among_the_stars( SDL_Renderer *R, GameState *GS, char *starspath ){
 	for (int z = 0; z < vec_size(ZL->E); ++z ){
 		if( SDL_strcmp( ZL->E[z].id, "bounds" ) == 0 ){
 			if( ZL->E[z].u.geo.type == geo_BOX ){
-				//SDL_Log("bounding!");
+				SDL_Log("bounding!");
 				SDL_FRect bounds = ZL->E[z].u.geo.u.box;
 				fit_frect( &bounds, &(GS->window_rct) );
 				set_scale( &T, bounds.w / ZL->E[z].u.geo.u.box.w );
@@ -1109,7 +1189,7 @@ void among_the_stars( SDL_Renderer *R, GameState *GS, char *starspath ){
 				scaleI = logarithm( 1.1, T.s );
 				T.cx = bounds.x - T.s * ZL->E[z].u.geo.u.box.x;
 				T.cy = bounds.y - T.s * ZL->E[z].u.geo.u.box.y;
-				//SDL_Log( "cx: %g, cy: %g", T.cx, T.cy );
+				SDL_Log( "cx: %g, cy: %g", T.cx, T.cy );
 				update_TM( &T, 0, 0, 0, 0 );
 			}
 		}
@@ -1117,15 +1197,12 @@ void among_the_stars( SDL_Renderer *R, GameState *GS, char *starspath ){
 
 	SDL_CloseIO( f );
 
-
-
 	int ships_N = 1;
 	Ship_inst **ships = SDL_malloc( ships_N * sizeof(Ship_inst*) );
 
 	ships[0] = GS->hero_ship;
 	ships[0]->pos = spawn;
 	ships[0]->vel = v2dzero;
-
 
 	//longest_path
 	SDL_FPoint *vbuf = SDL_malloc( 128 * sizeof(SDL_FPoint) );

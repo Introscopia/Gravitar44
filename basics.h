@@ -37,7 +37,7 @@
 #endif
 
 
-typedef void (*voidptr_func)( void *vptr );
+typedef void (*procedure)( void *vptr );
 
 // COLOR, DRAWING
 

@@ -777,7 +777,7 @@ Geo_Animation SVG_Element_to_Geo_Animation( SVG_Layer *L, SVG_Element *E ){
 		for (int g = 0; g < glen; ++g ){
 			int c = sscan_trailing_int( E->u.group[g].id );
 			//SDL_Log( "e:%d, m:%d, g: %d, c:%d", e, m, g, c );
-			if( c < 0 || c >= glen ) SDL_Log( "malformed cell name: %d", E->u.group[g].id );
+			if( c < 0 || c >= glen ) SDL_Log( "malformed cell name: %s", E->u.group[g].id );
 			GA.cells[c] = SVG_Element_to_Styled_Geo( E->u.group + g );
 		}
 	}

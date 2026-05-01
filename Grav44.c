@@ -5,8 +5,13 @@
 * HP, bullet modifier, collision modifier
 * fuel tank size
 * time factor, sim iterations
-* toggle smoke fx
+* cycle smoke fx { none * stripey * solid }
 * Select player color! / game palettes!
+
+-- EXTRAS --
+Homebase, get fixed up, get fuel
+Steal the reactor from NOVA, bring it back to homebase
+
 */
 #include <SDL.h>
 #include "basics.h"
@@ -90,8 +95,8 @@ int main(int argc, char *argv[]){
 	GS.controls[SHIELD]  = (Input){ .type = INPUT_NULL };
 	GS.controls[GRAB]    = (Input){ .type = INPUT_NULL };
 	GS.controls[DROP]    = (Input){ .type = INPUT_NULL };
-	GS.controls[FIRE1]   = (Input){ .type = INPUT_NULL };
-	GS.controls[FIRE2]   = (Input){ .type = INPUT_NULL };
+	GS.controls[FIRE_A]  = (Input){ .type = INPUT_KEYBOARD, .detail.key = SDLK_COMMA };
+	GS.controls[FIRE_B]  = (Input){ .type = INPUT_KEYBOARD, .detail.key = SDLK_PERIOD };
 	GS.controls[UI_YES]  = (Input){ .type = INPUT_KEYBOARD, .detail.key = SDLK_E };
 	GS.controls[UI_BACK] = (Input){ .type = INPUT_KEYBOARD, .detail.key = SDLK_Q };
 	GS.controls[PAUSE]   = (Input){ .type = INPUT_KEYBOARD, .detail.key = SDLK_ESCAPE };
@@ -102,7 +107,7 @@ int main(int argc, char *argv[]){
 	load_doodads( "Classic/Doodads.svg", &(GS.lib) );
 	
 	int hero_id = -1;
-	for (int i = 0; i < GS.lib.doodads; ++i ){
+	for (int i = 0; i < vec_size( GS.lib.doodads ); ++i ){
 		if( GS.lib.doodads[i].type == SHIP &&
 			SDL_strcmp( GS.lib.doodads[i].name, "Hero" ) == 0 ){
 			GS.hero_ship = instantiate_ship( &(GS.lib.doodads[i].u.ship) );

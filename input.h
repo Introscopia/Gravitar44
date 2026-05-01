@@ -20,14 +20,14 @@ typedef struct Input {
     
     Input_Type type;
 
-    SDL_JoystickID which_gamepad;   // only for gamepad events; ignored otherwise
+    SDL_JoystickID which_gamepad;
 
     union {
         SDL_Keycode key;
-        Uint8 mouse_motion; // 1: X axis, 2: Y axis
-        Uint8 mouse_pos;    // 1: X axis, 2: Y axis
-        Uint8 mouse_button; // SDL_BUTTON_LEFT, SDL_BUTTON_MIDDLE, SDL_BUTTON_RIGHT, SDL_BUTTON_X1, SDL_BUTTON_X2
-        Uint8 mouse_wheel;  // 1: X axis, 2: Y axis
+        Uint8 mouse_motion;   // 1: X axis, 2: Y axis
+        Uint8 mouse_pos;      // 1: X axis, 2: Y axis
+        Uint8 mouse_button;   // SDL_BUTTON_LEFT, SDL_BUTTON_MIDDLE, SDL_BUTTON_RIGHT, SDL_BUTTON_X1, SDL_BUTTON_X2
+        Uint8 mouse_wheel;    // 1: X axis, 2: Y axis
         SDL_GamepadButton gamepad_button;
         SDL_GamepadAxis gamepad_axis;
     } detail;

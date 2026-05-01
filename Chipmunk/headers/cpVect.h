@@ -38,6 +38,12 @@ static inline cpVect cpv(const cpFloat x, const cpFloat y)
 	return v;
 }
 
+// cpVect Polar
+static inline cpVect cpvp(const cpFloat d, const cpFloat a)
+{
+	return cpv( d*cpfcos(a), d*cpfsin(a) );
+}
+
 /// Check if two vectors are equal. (Be careful when comparing floating point numbers!)
 static inline cpBool cpveql(const cpVect v1, const cpVect v2)
 {

@@ -50,25 +50,43 @@ int SVG_layer_into_cpSpace( SVG_Layer *layer, cpSpace *space, bool physical_stro
 
 
 typedef struct obj_struct OBJ;
-typedef int (*obj_tick_func) ( OBJ *O );
+typedef int (*obj_func) ( OBJ *O );
 
-int age_and_pass_away( OBJ *O );
-
+int empty_obj_func( OBJ *O );
 
 typedef struct obj_struct{
 
-	int id;
-	cpBody *body;
+	int type;
 	void *data;
-	obj_tick_func tick;
+	obj_func tick;
+	obj_func destroy;
 
 } OBJ;
+
+
+typedef struct{
+	cpBody *body;
+	int age;
+} ageing_body;
+
+int ageing_body_tick( OBJ *O );
+int destroy_ageing_body( OBJ *O );
+
+typedef struct{
+	cpBody *body;
+	Style *style;
+	int status;
+} styled_body;
+
+int styled_body_tick( OBJ *O );
+int destroy_styled_body( OBJ *O );
+
 
 #define OBJ_PAGE_SIZE 64
 
 typedef struct obj_page_struct OBJ_Page;
 
-typedef struct obj_page_struct{
+typedef struct obj_page_struct {
 
 	OBJ *objs;
 	int oldest, index;
