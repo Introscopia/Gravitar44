@@ -788,7 +788,6 @@ void upon_a_sphere( SDL_Renderer *R, GameState *GS, char *spherepath ){
 		}
 	}
 
-
 	SVG_Layer_destroy( ZL );
 
 	//cpSpaceSetGravity( space, cpv(0, 10) );
@@ -806,12 +805,9 @@ void upon_a_sphere( SDL_Renderer *R, GameState *GS, char *spherepath ){
 	init_ship_physics( ships[0], space, spawn );
 	//cpVect p0 = cpBodyGetPosition( ships[0]->body ); SDL_Log("p0: %lg, %lg\n", xy(p0) );
 
-	//SDL_Log( "puffs: %p, puff_dims.h: %d", GS->lib.puffs, GS->lib.puff_dims.h );
 
-
-	OBJ_Page OBJS;
-	init_OBJ_Page( &OBJS );
-
+	OBJ_Page *OBJS = SDL_malloc( sizeof(OBJ_Page) );
+	init_OBJ_Page( OBJS );
 
 	SDL_Surface *smosurf = SDL_LoadPNG( "Classic/wavies.png" );
 	SDL_Texture *smokey_texture = SDL_CreateTextureFromSurface( R, smosurf );
@@ -873,6 +869,7 @@ void upon_a_sphere( SDL_Renderer *R, GameState *GS, char *spherepath ){
 	/* |o| |o| |o| |o| |o| |o| |o| |o| |o| |o| |o| |o| |o| |o| |o| |o| |o| |o| |o| |o| |o| |o| |o| |o| |o| */
 	/*   |o| |o| |o| |o| |o| |o| |o| |o| |o| |o| |o| |o| |o| |o| |o| |o| |o| |o| |o| |o| |o| |o| |o| |o|   */
 	/* |o| |o| |o| |o| |o| |o| |o| |o| |o| |o| |o| |o| |o| |o| |o| |o| |o| |o| |o| |o| |o| |o| |o| |o| |o| */
+	SDL_Log("I am upon...");
 	while(1){
 
 		SDL_Event event;
@@ -937,7 +934,7 @@ void upon_a_sphere( SDL_Renderer *R, GameState *GS, char *spherepath ){
 		cpVect p1pos = cpBodyGetPosition( ships[0]->body );
 
 		if( GS->controls[ FIRE_A ].current ){
-			OBJ *slot = fresh_OBJ_slot( &OBJS );
+			OBJ *slot = fresh_OBJ_slot( OBJS );
 			double heading = cpBodyGetAngle( ships[0]->body ) - HALF_PI;
 			cpVect trig = cpvforangle( heading );
 			cpVect pos = cpvadd( p1pos, cpvmult( cpvrotate( cpv(1,0), trig ), circumship0.radius ) ); 
@@ -1014,7 +1011,7 @@ void upon_a_sphere( SDL_Renderer *R, GameState *GS, char *spherepath ){
 				                       &(ships[s]->exh_timer),
                          		       &T, vbuf );
 				/* Create smoke */
-				OBJ *slot = fresh_OBJ_slot( &OBJS );
+				OBJ *slot = fresh_OBJ_slot( OBJS );
 				cpVect svel = cpvmult( cpBodyGetVelocity( ships[s]->body ), 0.5 );
 				cpVect exhvel = cpv_rottrig( cpv( 0, puffscale * 32 ), trig );//v2d_rotate( cpv( 0, 32 ), sheading ); //cpBodyLocalToWorld( ships[s]->body, cpv( 0, 32 ) );
 				cpVect vel = cpvadd( svel, exhvel );
@@ -1028,42 +1025,44 @@ void upon_a_sphere( SDL_Renderer *R, GameState *GS, char *spherepath ){
 
 		// -- Objects tick -- 
 
-		OBJ_Page *OP = &OBJS;
+		OBJ_Page *OP = OBJS;
 		do{
 			int i = OP->oldest;
 			for( int c = 0; c < OBJ_PAGE_SIZE; ++c ){
 
-				switch( OP->objs[i].type ){
+				if( OP->objs[i].type != EMPTY ){
 
-					case SMOKE:{
-						ageing_body* ab = (ageing_body*)(OP->objs[i].data);
-						cpVect obpos = cpBodyGetPosition( ab->body );
-						SDL_SetRenderTarget( R, puff_mask );
-						SDL_SetRenderDrawColor( R, 255, 255, 255, 
-							                    constrain( map(ab->age, 0, 35, 0, 255), 0, 255) );
-						TM_APPLY_TO( obpos, obpos, T.M );
-						gp_fill_8circle( R, obpos.x, obpos.y, T.s * 1.8 * puffscale );
-						SDL_SetRenderTarget( R, NULL );
+					switch( OP->objs[i].type ){
 
-						if( OP->objs[i].tick( OP->objs + i ) ){
-							OBJ_expired( OP, i );
-						}
-						} break;
+						case SMOKE:{
+							ageing_body* ab = (ageing_body*)(OP->objs[i].data);
+							cpVect obpos = cpBodyGetPosition( ab->body );
+							SDL_SetRenderTarget( R, puff_mask );
+							SDL_SetRenderDrawColor( R, 255, 255, 255, 
+								                    constrain( map(ab->age, 0, 35, 0, 255), 0, 255) );
+							TM_APPLY_TO( obpos, obpos, T.M );
+							gp_fill_8circle( R, obpos.x, obpos.y, T.s * 1.8 * puffscale );
+							SDL_SetRenderTarget( R, NULL );
+							} break;
 
-					case BULLET:{
-						styled_body *sb = (styled_body*)(OP->objs[i].data);
-						SDL_SetRenderDraw_SDL_Color( R, sb->style->stroke_color );
-						stroke_cpBody( R, sb->body, &T ); 
-						} break;
+						case BULLET:{
+							styled_body *sb = (styled_body*)(OP->objs[i].data);
+							SDL_SetRenderDraw_SDL_Color( R, sb->style->stroke_color );
+							stroke_cpBody( R, sb->body, &T ); 
+							} break;
 
-					case DEBRIS: 
-					case ROCK: 
-					case PARTICLE: 
-					case FUEL: 
-					case REPAIR_PACK: 
-					case POWERUP: 
+						case DEBRIS: 
+						case ROCK: 
+						case PARTICLE: 
+						case FUEL: 
+						case REPAIR_PACK: 
+						case POWERUP: 
+					}
+
+					if( OP->objs[i].tick( OP->objs + i ) ){
+						OBJ_expired( OP, i );
+					}
 				}
-
 				if( i == OP->index ) break;
 				i = cycle( i + 1, 0, OBJ_PAGE_SIZE-1 );
 			}
@@ -1085,6 +1084,9 @@ void upon_a_sphere( SDL_Renderer *R, GameState *GS, char *spherepath ){
 		
 	}//%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 	end:
+
+	destroy_OBJ_Book( OBJS, space );
+
 	cpSpaceFree(space);
 
 	destroy_world( world_data );

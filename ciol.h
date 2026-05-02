@@ -74,7 +74,7 @@ int destroy_ageing_body( OBJ *O );
 
 typedef struct{
 	cpBody *body;
-	Style *style;
+	Style *style; //reference!
 	int status;
 } styled_body;
 
@@ -99,6 +99,7 @@ typedef struct obj_page_struct {
 void init_OBJ_Page( OBJ_Page *OP );
 OBJ *fresh_OBJ_slot( OBJ_Page *OP );
 void OBJ_expired( OBJ_Page *OP, int i );
+void destroy_OBJ_Book( OBJ_Page *OP, cpSpace *space );
 
 bool cpDestroyBody_and_its_shapes(cpBody *body);
 

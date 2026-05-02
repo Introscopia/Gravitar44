@@ -397,7 +397,6 @@ int destroy_styled_body( OBJ *O ){
 
 void init_OBJ_Page( OBJ_Page *OP ){
 	OP->objs = SDL_calloc( OBJ_PAGE_SIZE, sizeof(OBJ) );
-	//for (int i = 0; i < OBJ_PAGE_SIZE; ++i ) OP->objs[i].bod = NULL;
 	OP->oldest = 0;
 	OP->index = 0;
 	OP->full = 0;
@@ -438,6 +437,30 @@ void OBJ_expired( OBJ_Page *OP, int i ){
 			} while ( OP->objs[ OP->oldest ].type <= 0 );
 		}
 	}
+	// no worries if not! I'll be back...
+}
+
+void destroy_OBJ_Book( OBJ_Page *OP, cpSpace *space ){
+
+	do{
+		while(1){
+			int clear = 0;
+			for( int c = 0; c < OBJ_PAGE_SIZE; ++c ){
+				if( OP->objs[c].type <= 0 ){ 
+					clear++;
+					continue;
+				}
+				OBJ_expired( OP, c );
+			}
+			if( clear >= OBJ_PAGE_SIZE ) break;
+
+			cpSpaceStep( space, 0.1 );
+		}
+		SDL_free( OP->objs );
+		OBJ_Page *next = OP->next;
+		SDL_free( OP );
+		OP = next;
+	} while( OP != NULL );
 }
 
 
