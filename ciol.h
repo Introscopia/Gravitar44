@@ -1,7 +1,7 @@
 
 // CHIPMUNK PHYSICS GRAPHICAL WRAPPER
-#ifndef CPGW_H
-#define CPGW_H
+#ifndef CIOL_H
+#define CIOL_H
 
 #include "basics.h"
 #include "vec2d.h"
@@ -35,18 +35,20 @@ typedef struct {
 
 } cpProperties;
 
-static const char cpProperty_tags [9][16] = { "behavior", "density", "friction", "elasticity", "composite", 
-						                      "collisionType", "group", "categories", "mask" };
-
 cpProperties retrieve_cpProperties_from_SVG_metadata( SVG_Element *E, char** Ltags,
-													  Hashmap *comp_map, Hashmap *group_map );
+													  Hashmap *comp_map, Hashmap *group_map,
+													  int default_CT );
 
 
 cpShape *Geometric_to_cpShape( Geometric *geo, cpBody *body, float stroke_width );
 
-int SVG_layer_into_cpSpace( SVG_Layer *layer, cpSpace *space, bool physical_stroke );
+int SVG_layer_into_cpSpace( SVG_Layer *layer, cpSpace *space, bool physical_stroke, int CT );
 
 
+void ship_hurt( cpArbiter *arb, cpSpace *space, void *unused );
+void ship_kamikaze( cpArbiter *arb, cpSpace *space, void *unused );
+void ship_shot( cpArbiter *arb, cpSpace *space, void *unused );
+void sbod_down( cpArbiter *arb, cpSpace *space, void *unused );
 
 
 typedef struct obj_struct OBJ;

@@ -28,6 +28,9 @@ void load_doodads( char *filename, Library *lib ){
 		SDL_Log( "failed to load \"Layer 1\"" );
 		return;
 	}
+	else{
+		SDL_Log("loaded a layer here, first element is : \"%s\"", L->E[0].id );
+	}
 	SDL_CloseIO( f );
 
 	int class_id = -1;
@@ -64,8 +67,8 @@ void load_doodads( char *filename, Library *lib ){
 	L->styles = NULL;
 
 	Hashmap class_map;
-	new_hashmap( &class_map, 1, 12, "empty", "terrain", "rock", "ship", "building",
-			          			    "smoke", "bullet", "debris", "particle",  "fuel", 
+	new_hashmap( &class_map, 1, 10, "empty", "rock", "ship", "building",
+			          			    "smoke", "bullet", "particle", "fuel", 
 			          			    "repair_pack", "powerUp" );
 	Hashmap doodelements_map;//                0         1        2        3        4
 	new_hashmap( &doodelements_map, 1, 5, "physical", "visual", "exhaust", "center", "smoke" );
@@ -110,6 +113,7 @@ void load_doodads( char *filename, Library *lib ){
 					}
 
 					SDL_strlcpy( lib->doodads[D].name, L->E[e].id, 64 );
+					SDL_Log("lib->doodads[D].name: \"%s\"", lib->doodads[D].name );
 
 					for (int m = 0; m < ms; ++m ){
 						int t = L->E[e].metadata[m].tag_index;
@@ -138,7 +142,7 @@ void load_doodads( char *filename, Library *lib ){
 					if( doodelements[3] >= 0 ){
 						SVG_Element *CE = L->E[e].u.group + doodelements[3];
 						if( CE->type != SVG_GEO || CE->u.geo.type != geo_CIRCLE ){
-							SDL_Log( "that's not how you do a doodad's center! (%s)", CE->id );
+							SDL_Log( "doodad's center must be a circle (%s)", CE->id );
 						}
 						offset = v2d_neg( CE->u.geo.u.circle.pos );
 					}
@@ -154,7 +158,7 @@ void load_doodads( char *filename, Library *lib ){
 							if( PE->u.group[p].u.geo.type == geo_PATH ) PE->u.group[p].u.geo.u.path.N = 0;// take ownership away from layer
 							geo_offset( lib->doodads[D].u.ship.physical + p, offset );
 
-							cpProperties pr = retrieve_cpProperties_from_SVG_metadata( PE->u.group + p, L->tags, NULL, NULL );
+							cpProperties pr = retrieve_cpProperties_from_SVG_metadata( PE->u.group + p, L->tags, NULL, NULL, 0 );
 							lib->doodads[D].u.ship.properties[p] = pr;
 						}
 					}
@@ -164,7 +168,7 @@ void load_doodads( char *filename, Library *lib ){
 						lib->doodads[D].u.ship.physical[0] = PE->u.geo;
 						if( PE->u.geo.type == geo_PATH ) PE->u.geo.u.path.N = 0;// take ownership away from layer
 						geo_offset( lib->doodads[D].u.ship.physical + 0, offset );
-						cpProperties pr = retrieve_cpProperties_from_SVG_metadata( PE, L->tags, NULL, NULL );
+						cpProperties pr = retrieve_cpProperties_from_SVG_metadata( PE, L->tags, NULL, NULL, 0 );
 						lib->doodads[D].u.ship.properties[0] = pr;
 					}
 
@@ -278,6 +282,8 @@ void init_ship_physics( Ship_inst *ship, cpSpace *space, cpVect pos ){
 		cpShapeSetElasticity( shape, ship->data->properties[p].elasticity );
 		cpShapeFilter filter = cpShapeFilterNew( 0, de_mask( "v" ), de_mask( "bvst" ) );
 		cpShapeSetFilter( shape, filter );
+		cpShapeSetCollisionType( shape, SHIP );
+		cpShapeSetUserData( shape, (cpDataPointer) ship );
 	}
 	/*SDL_Log( "ship mass: %g", cpBodyGetMass( ship->body ) );
 	cpVect cog = cpBodyGetCenterOfGravity( ship->body );
@@ -614,7 +620,7 @@ void create_bullet( cpSpace *space, OBJ *O, cpVect pos, cpVect vel, double headi
 	cpShapeSetDensity( shape, 0.07 );
 	cpShapeSetElasticity( shape, 0.66 );
 	cpShapeSetFriction( shape, 0.04 );
-	cpShapeFilter filter = cpShapeFilterNew( 0, de_mask( "b" ), de_mask( "stv" ) );
+	cpShapeFilter filter = cpShapeFilterNew( 0, de_mask( "b" ), de_mask( "bstv" ) );
 	cpShapeSetFilter( shape, filter );
 	cpShapeSetCollisionType( shape, BULLET );
 	cpShapeSetUserData( shape, (cpDataPointer)O );
@@ -633,12 +639,28 @@ void create_bullet( cpSpace *space, OBJ *O, cpVect pos, cpVect vel, double headi
 
 
 
+
+
+
+
 void upon_a_sphere( SDL_Renderer *R, GameState *GS, char *spherepath ){
 
 	bool debug_view = false;
 	
 	cpSpace *space;
 	space = cpSpaceNew();
+
+	    cpCollisionHandler *ship_rock_CH = cpSpaceAddCollisionHandler( space, SHIP, ROCK );
+	         ship_rock_CH->postSolveFunc = ship_hurt;
+	cpCollisionHandler *ship_building_CH = cpSpaceAddCollisionHandler( space, SHIP, BUILDING );
+	     ship_building_CH->postSolveFunc = ship_kamikaze;
+	    cpCollisionHandler *ship_ship_CH = cpSpaceAddCollisionHandler( space, SHIP, SHIP );
+	         ship_ship_CH->postSolveFunc = ship_kamikaze;
+	  cpCollisionHandler *ship_bullet_CH = cpSpaceAddCollisionHandler( space, SHIP, BULLET );
+	       ship_bullet_CH->postSolveFunc = ship_shot;
+	  cpCollisionHandler *bullet_rock_CH = cpSpaceAddCollisionHandler( space, BULLET, ROCK );
+	       bullet_rock_CH->postSolveFunc = sbod_down;
+
 
 
 	Transform T = { 0, 0, GS->cx, GS->cy, 1, 1, {0} };
@@ -667,7 +689,7 @@ void upon_a_sphere( SDL_Renderer *R, GameState *GS, char *spherepath ){
 
 	SVG_Layer *PL = svg_load_layer( f, "Physical" );
 	//SDL_Log( "converting layer to space...");
-	SVG_layer_into_cpSpace( PL, space, false );
+	SVG_layer_into_cpSpace( PL, space, false, ROCK );
 
 	for (int m = 0; m < vec_size( PL->metadata ); ++m ){
 		int t = PL->metadata[m].tag_index;
@@ -933,13 +955,18 @@ void upon_a_sphere( SDL_Renderer *R, GameState *GS, char *spherepath ){
 
 		cpVect p1pos = cpBodyGetPosition( ships[0]->body );
 
+		// -- Fire ze weapons --
 		if( GS->controls[ FIRE_A ].current ){
-			OBJ *slot = fresh_OBJ_slot( OBJS );
-			double heading = cpBodyGetAngle( ships[0]->body ) - HALF_PI;
-			cpVect trig = cpvforangle( heading );
-			cpVect pos = cpvadd( p1pos, cpvmult( cpvrotate( cpv(1,0), trig ), circumship0.radius ) ); 
-			cpVect vel = cpvadd( cpBodyGetVelocity( ships[0]->body ), cpvmult( trig, 350 ) );
-			create_bullet( space, slot, pos, vel, heading, &bullet_style );
+			Uint64 now = SDL_GetTicks();
+			if( now > ships[0]->next_shot ){
+				ships[0]->next_shot = now + ships[0]->gun_cooldown;
+				OBJ *slot = fresh_OBJ_slot( OBJS );
+				double heading = cpBodyGetAngle( ships[0]->body ) - HALF_PI;
+				cpVect trig = cpvforangle( heading );
+				cpVect pos = cpvadd( p1pos, cpvmult( cpvrotate( cpv(1,0), trig ), circumship0.radius ) ); 
+				cpVect vel = cpvadd( cpBodyGetVelocity( ships[0]->body ), cpvmult( trig, 350 ) );
+				create_bullet( space, slot, pos, vel, heading, &bullet_style );
+			}
 		}
 
 
@@ -956,14 +983,14 @@ void upon_a_sphere( SDL_Renderer *R, GameState *GS, char *spherepath ){
 
 			cpSpaceStep( space, delta_time );
 		}
-
-		for (int s = 0; s < ships_N; ++s ){
-			world_bounding( world_data, ships[s]->body );
-		}
-		
-
 		prev_pilot_vec = pilot_vec;
- 
+
+
+ 		// -- after motion, check everything is still in bounds... --
+
+ 		// this needs to happen first cause it affects the camera...
+ 		world_bounding( world_data, ships[0]->body );
+
 		p1pos = cpBodyGetPosition( ships[0]->body );
 		//SDL_Log("p1pos: %lg, %lg\n", xy(p1pos) );
 
@@ -987,9 +1014,11 @@ void upon_a_sphere( SDL_Renderer *R, GameState *GS, char *spherepath ){
 		// -- Render Map -- 
 		render_world( R, world_data, map_visuals, &T, vbuf );
 
-		// -- Render ships, emit FX -- 
+		// -- Ships tick -- 
 		for (int s = 0; s < ships_N; ++s ){
 			//SDL_Log( "s: %d", s );
+
+			world_bounding( world_data, ships[s]->body );
 
 			cpVect spos = cpBodyGetPosition( ships[s]->body );
 			double sheading = cpBodyGetAngle( ships[s]->body );
@@ -1023,8 +1052,8 @@ void upon_a_sphere( SDL_Renderer *R, GameState *GS, char *spherepath ){
 		}
 		T.M = WT;// reset for next step
 
-		// -- Objects tick -- 
 
+		// -- Objects tick -- 
 		OBJ_Page *OP = OBJS;
 		do{
 			int i = OP->oldest;
@@ -1047,11 +1076,11 @@ void upon_a_sphere( SDL_Renderer *R, GameState *GS, char *spherepath ){
 
 						case BULLET:{
 							styled_body *sb = (styled_body*)(OP->objs[i].data);
+							world_bounding( world_data, sb->body );
 							SDL_SetRenderDraw_SDL_Color( R, sb->style->stroke_color );
-							stroke_cpBody( R, sb->body, &T ); 
+							stroke_cpBody( R, sb->body, &T );
 							} break;
 
-						case DEBRIS: 
 						case ROCK: 
 						case PARTICLE: 
 						case FUEL: 
@@ -1071,6 +1100,13 @@ void upon_a_sphere( SDL_Renderer *R, GameState *GS, char *spherepath ){
 
 		RenderCopyMasked( R, smokey_texture, puff_mask, smoke_target );
 		fade_Texture( R, puff_mask, 225 );
+
+		// -- GUI --
+
+		// -- HP bar ---
+		SDL_SetRenderDrawColor( R, 40, 255, 40, 255 );
+		SDL_RenderRect( R, &(SDL_FRect){ 10, 60, 180, 40 } );
+		SDL_RenderFillRect( R, &(SDL_FRect){ 15, 65, map(ships[0]->hull, 0, ships[0]->data->hull_max, 0, 170), 30 } );
 
 		
 
@@ -1298,7 +1334,6 @@ void among_the_stars( SDL_Renderer *R, GameState *GS, char *starspath ){
                          		       &T, vbuf );
 			}
 		}
-
 
 		SDL_SetRenderDrawColor( R, 100, 255, 240, 255 );
 		SDL_framerate_limit_n_monitor( R, 17 );

@@ -87,6 +87,7 @@
        class="ship"
        density="0.01"
        friction="0.06"
+       hull_max="100"
        thrust="200000"
        turn_speed="260"
        fuel_max="8000"

@@ -11,10 +11,10 @@
 #include "input.h"
 
 
-enum types_of_stuff { EMPTY, TERRAIN, ROCK, SHIP, BUILDING,
-			          SMOKE, BULLET, DEBRIS, PARTICLE, 
+enum types_of_stuff { EMPTY, ROCK, SHIP, BUILDING,
+			          SMOKE, BULLET, PARTICLE, 
 			          FUEL, REPAIR_PACK, POWERUP };
-
+// if you change these, change class_map as well!
 
 
 #define exh_frame_cycle 5
@@ -57,6 +57,9 @@ typedef struct ship_inst_struct{
 
 	int exh_frame; // frame we're currently showing
 	int exh_timer; //counts down the game frames until the next exh animation tick.
+
+	int gun_cooldown;
+	Uint64 next_shot;
 
 } Ship_inst;
 

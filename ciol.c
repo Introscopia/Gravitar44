@@ -6,6 +6,7 @@
 #include "geometry.h"
 #include "primitives.h"
 #include "cvec.h"
+#include "game.h"
 
 
 cpVect cpv_polar( double m, double a ){
@@ -183,9 +184,9 @@ cpShape *Geometric_to_cpShape( Geometric *geo, cpBody *body, float stroke_width 
 }
 
 
-
 cpProperties retrieve_cpProperties_from_SVG_metadata( SVG_Element *E, char** Ltags,
-													  Hashmap *comp_map, Hashmap *group_map ){
+													  Hashmap *comp_map, Hashmap *group_map,
+													  int default_CT ){
 
 	cpProperties out = {
 		.behavior = 's',
@@ -193,13 +194,15 @@ cpProperties retrieve_cpProperties_from_SVG_metadata( SVG_Element *E, char** Lta
 		.friction = 0.7,
 		.elasticity = 0.35,
 		.composite = -1,
-		.collisionType = 0,
+		.collisionType = default_CT,
 		.group = CP_NO_GROUP,
 		.categories = CP_ALL_CATEGORIES,
 		.mask = CP_ALL_CATEGORIES,
 		};
 	//SDL_memset( &out, 0, sizeof(out) );
 
+	static const char cpProperty_tags [9][16] = { "behavior", "density", "friction", "elasticity", "composite", 
+						                          "collisionType", "group", "categories", "mask" };
 	static Hashmap *tag_map = NULL;
 	if( tag_map == NULL ){
 		tag_map = SDL_malloc( sizeof(*tag_map) );
@@ -244,7 +247,7 @@ cpProperties retrieve_cpProperties_from_SVG_metadata( SVG_Element *E, char** Lta
 				if( comp_map != NULL ) out.composite = ok_map_get( comp_map, E->metadata[m].data )-1;
 				break;
 			case 5:
-				//out.collisionType = E->metadata[m].data.u.i;
+				out.collisionType = SDL_atoi( E->metadata[m].data );
 				break;
 			case 6:
 				if( group_map != NULL ) out.group = ok_map_get( group_map, E->metadata[m].data )-1;
@@ -263,7 +266,7 @@ cpProperties retrieve_cpProperties_from_SVG_metadata( SVG_Element *E, char** Lta
 
 
 
-int SVG_layer_into_cpSpace( SVG_Layer *layer, cpSpace *space, bool physical_stroke ){
+int SVG_layer_into_cpSpace( SVG_Layer *layer, cpSpace *space, bool physical_stroke, int CT ){
 
 	Hashmap comp_map;
 	ok_map_init( &comp_map );
@@ -301,7 +304,7 @@ int SVG_layer_into_cpSpace( SVG_Layer *layer, cpSpace *space, bool physical_stro
 	for (int e = 0; e < vec_size(layer->E); ++e ){
 
 		cpProperties pr = retrieve_cpProperties_from_SVG_metadata( layer->E + e, layer->tags, 
-			                                                       &comp_map, NULL );
+			                                                       &comp_map, NULL, CT );
 
 		cpBody *body = NULL;
 		float stroke_width = 0;
@@ -395,6 +398,37 @@ int destroy_styled_body( OBJ *O ){
 }
 
 
+
+
+void ship_hurt( cpArbiter *arb, cpSpace *space, void *unused ){
+	CP_ARBITER_GET_SHAPES(arb, a, b);
+	Ship_inst *ship = cpShapeGetUserData( a );
+	//double impact_vel = cpvlength( cpArbiterGetSurfaceVelocity( arb ) );
+
+	//cpFloat dt = cpSpaceGetCurrentTimeStep(space);
+	//// Convert the impulse to a force by dividing it by the timestep.
+	//cpFloat force = cpConstraintGetImpulse(joint)/dt
+
+	//double impulse = cpvlength( cpArbiterTotalImpulse(arb) );
+	//cpVect cpArbiterTotalImpulse(cpArbiter *arb);
+	double KE = cpArbiterTotalKE(arb);
+	ship->hull -= 0.0001 * KE;
+	//SDL_Log("impulse: %lg, KE: %lg\n", impulse, KE );
+}
+void ship_kamikaze( cpArbiter *arb, cpSpace *space, void *unused ){
+	CP_ARBITER_GET_SHAPES(arb, a, b);
+}
+void ship_shot( cpArbiter *arb, cpSpace *space, void *unused ){
+	CP_ARBITER_GET_SHAPES(arb, a, b);
+}
+void sbod_down( cpArbiter *arb, cpSpace *space, void *unused ){
+	CP_ARBITER_GET_SHAPES( arb, a, b );
+	OBJ *O = cpShapeGetUserData( a );
+	styled_body* sb = (styled_body*)(O->data);
+	sb->status = 1;
+}
+
+
 void init_OBJ_Page( OBJ_Page *OP ){
 	OP->objs = SDL_calloc( OBJ_PAGE_SIZE, sizeof(OBJ) );
 	OP->oldest = 0;
@@ -441,7 +475,6 @@ void OBJ_expired( OBJ_Page *OP, int i ){
 }
 
 void destroy_OBJ_Book( OBJ_Page *OP, cpSpace *space ){
-
 	do{
 		while(1){
 			int clear = 0;

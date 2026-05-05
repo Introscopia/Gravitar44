@@ -111,8 +111,12 @@ int main(int argc, char *argv[]){
 		if( GS.lib.doodads[i].type == SHIP &&
 			SDL_strcmp( GS.lib.doodads[i].name, "Hero" ) == 0 ){
 			GS.hero_ship = instantiate_ship( &(GS.lib.doodads[i].u.ship) );
+			GS.hero_ship->gun_cooldown = 333;
 			SDL_Log( "found the Hero, instantiated it" );
 			break;
+		}
+		else{
+			SDL_Log( "\"%s\" is not my hero...", GS.lib.doodads[i].name );
 		}
 	}
 
