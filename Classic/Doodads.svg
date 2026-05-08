@@ -24,15 +24,15 @@
      inkscape:deskcolor="#d1d1d1"
      inkscape:document-units="px"
      showgrid="false"
-     inkscape:zoom="4.9166667"
-     inkscape:cx="76.881355"
-     inkscape:cy="64.474575"
+     inkscape:zoom="9.8333334"
+     inkscape:cx="55.169491"
+     inkscape:cy="52.169491"
      inkscape:window-width="1366"
      inkscape:window-height="697"
      inkscape:window-x="-8"
      inkscape:window-y="-8"
      inkscape:window-maximized="1"
-     inkscape:current-layer="layer1" />
+     inkscape:current-layer="Hero" />
   <defs
      id="defs2" />
   <g
@@ -94,7 +94,7 @@
        fuel_consumption="0.25">
       <path
          d="m 70.788791,57.079193 -5,9 h -4 l -4,-7 -4,7 h -4 l -5,-9 13,-23 z"
-         style="display:inline;fill:none;stroke:#0000ff;stroke-width:1;stroke-opacity:1"
+         style="display:inline;fill:none;stroke:#165aff;stroke-width:1;stroke-opacity:1"
          id="Hero:visual"
          sodipodi:nodetypes="ccccccccc" />
       <path

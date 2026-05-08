@@ -416,6 +416,11 @@ double map(double value, double source_lo, double source_hi,  double dest_lo, do
 	return dest_lo + (dest_hi - dest_lo) * ((value - source_lo) / (source_hi - source_lo));
 }
 
+// constrained map
+double cmap(double value, double source_lo, double source_hi,  double dest_lo, double dest_hi) {
+	return constrainD( map(value, source_lo, source_hi,  dest_lo, dest_hi), dest_lo, dest_hi );
+}
+
 double ellipticalMap(double value, double source_lo, double source_hi, double dest_lo, double dest_hi){
   return dest_hi +((dest_lo-dest_hi)/SDL_abs(dest_lo-dest_hi))*SDL_sqrt((1-(sq(value-source_lo)/sq(source_hi-source_lo)))*sq(dest_hi-dest_lo));
 }

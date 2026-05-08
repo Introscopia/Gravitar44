@@ -625,7 +625,7 @@ void fscan_svg_group( SDL_IOStream* f, SVG_Element **evec, SVG_Layer* layer,
 
 SVG_Layer* svg_load_layer(SDL_IOStream* f, const char* layer_label ){
 	if( !f || !layer_label ){
-		SDL_Log("   ?   ");
+		SDL_Log("svg_load_layer cannot start: f: %p, layer_label: \"%s\"", f, layer_label );
 		return NULL;
 	}
 	

@@ -218,6 +218,9 @@ void load_doodads( char *filename, Library *lib ){
 					}
 					//else SDL_Log("Bad smoke!");
 					} break;
+
+				default:
+					SDL_Log( "hmm, trying to make a doodad type %d...", C );
 			}
 
 			D++;
@@ -362,10 +365,13 @@ void pilot_THRUSTER( Ship_inst *S, vec2d pilot_vec, vec2d prev_pilot_vec, double
 
 
 
-void init_flat_world( void **W, SDL_FRect bounds, SDL_FRect goff, Styled_Geo *map_visuals, int width ){
+void init_flat_world( void **W, SDL_FRect bounds, SDL_FRect goff, Styled_Geo *map_visuals, int width, 
+					  SDL_Texture *puff_mask, float puffscale, world_bounding_func world_bounding ){
 
 	*W = SDL_malloc( sizeof(flat_world) );
 	flat_world *fw = (flat_world*)(*W);
+
+	fw->morphology = FLAT;
 
 	fw->bounds = bounds;
 	fw->gravity_falloff = goff;
@@ -374,6 +380,10 @@ void init_flat_world( void **W, SDL_FRect bounds, SDL_FRect goff, Styled_Geo *ma
 	fw->chunks = SDL_calloc( fw->chunks_N, sizeof(int*) );
 	fw->chunk_w = bounds.w / fw->chunks_N;
 	fw->width = width;
+
+	fw->puff_mask = puff_mask;
+	fw->puffscale = puffscale;
+	fw->world_bounding = world_bounding;
 	
 	//SDL_Log("chunk_w: %g\n", chunk_w );
 	int map_N = vec_size( map_visuals );
@@ -418,7 +428,7 @@ void flat_world_bounding( void *W, cpBody *b ){
 		cpBodySetPosition( b, pos );
 	}
 }
-void flat_world_update_camera( Transform *T, cpVect target, double *world_angle, 
+void flat_world_update_camera( void *W, Transform *T, cpVect target, double *world_angle, 
 	                           SDL_FRect window_rct, SDL_FRect bounds ){
 	T->tx = target.x;
 	
@@ -441,6 +451,16 @@ void flat_world_update_camera( Transform *T, cpVect target, double *world_angle,
 	}
 
 	update_TM( T, 0, 0, 0, 0 );
+
+	flat_world *fw = (flat_world*) W;
+
+	fw->vpl = rtfX( 0, *T );
+	fw->cwl = fw->vpl < 0;
+	fw->vpl = fw->vpl + bounds.w;
+
+	fw->vpr = rtfX( fw->width, *T );
+	fw->cwr = fw->vpr > bounds.w;
+	fw->vpr = fw->vpr - bounds.w;
 }
 void render_flat_world( SDL_Renderer *R, void *W, Styled_Geo *map_visuals, Transform *T, SDL_FPoint *vbuf ){
 	flat_world *fw = (flat_world*) W;
@@ -503,14 +523,19 @@ bool inside_flat_world( void *W, cpVect p ){
 	}
 }
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-void init_round_world( void **W, double brad, double srad ){
+void init_round_world( void **W, double brad, double srad, 
+					  SDL_Texture *puff_mask, float puffscale, world_bounding_func world_bounding ){
 	*W = SDL_malloc( sizeof(round_world) );
 	round_world *rw = (round_world*)(*W);
+	rw->morphology = ROUND;
 	rw->bounds = brad;
 	rw->bounds_sq = brad * brad;
 	rw->surface_rad = srad;
 	rw->surface_radsq = srad * srad;
 	rw->surface_radcubed = rw->surface_radsq * srad;
+	rw->puff_mask = puff_mask;
+	rw->puffscale = puffscale;
+	rw->world_bounding = world_bounding;
 }
 void destroy_round_world( void *W ){
 	//round_world *rw = (round_world*) W;
@@ -520,7 +545,7 @@ void round_world_bounding( void *W, cpBody *b ){
 	//round_world *rw = (round_world*) W;
 	//cpVect pos = cpBodyGetPosition( b );
 }
-void round_world_update_camera( Transform *T, cpVect target, double *world_angle, SDL_FRect window_rct, SDL_FRect bounds ){
+void round_world_update_camera( void *W, Transform *T, cpVect target, double *world_angle, SDL_FRect window_rct, SDL_FRect bounds ){
 	T->tx = target.x;
 	T->ty = target.y;
 
@@ -567,6 +592,95 @@ bool inside_round_world( void *W, cpVect p ){
 	double plsq = cpvlengthsq(p);
 	return ( plsq < rw->bounds_sq );
 }
+
+void render_the_objects( SDL_Renderer *R, OBJ_Page *OBJS, void *world_data, Transform *T ){
+
+	SDL_Texture *puff_mask;
+	float puffscale;
+	world_bounding_func world_bounding;
+
+	int *morphology = (int*) world_data;
+	if( *morphology == FLAT ){
+		flat_world *fw = (flat_world*) world_data;
+		puff_mask = fw->puff_mask;
+		puffscale = fw->puffscale;
+		world_bounding = fw->world_bounding;
+	}
+	if( *morphology == ROUND ){
+		round_world *rw = (round_world*) world_data;
+		puff_mask = rw->puff_mask;
+		puffscale = rw->puffscale;
+		world_bounding = rw->world_bounding;
+	}
+
+	OBJ_Page *OP = OBJS;
+	do{
+		int i = OP->oldest;
+		for( int c = 0; c < OBJ_PAGE_SIZE; ++c ){
+
+			if( OP->objs[i].type != EMPTY ){
+
+				switch( OP->objs[i].type ){
+
+					case SMOKE:{
+						ageing_body* ab = (ageing_body*)(OP->objs[i].data);
+						cpVect obpos = cpBodyGetPosition( ab->body );
+						SDL_SetRenderTarget( R, puff_mask );
+						SDL_SetRenderDrawColor( R, 255, 255, 255, 
+							                    constrain( map(ab->age, 0, 35, 0, 255), 0, 255) );
+						TM_APPLY_TO( obpos, obpos, T->M );
+						gp_fill_8circle( R, obpos.x, obpos.y, T->s * 1.8 * puffscale );
+						SDL_SetRenderTarget( R, NULL );
+						} break;
+
+					case BULLET:
+					case ROCK:{
+						styled_body *sb = (styled_body*)(OP->objs[i].data);
+						world_bounding( world_data, sb->body );
+						SDL_SetRenderDraw_SDL_Color( R, sb->style->stroke_color );
+						stroke_cpBody( R, sb->body, T );
+						} break;
+
+					case PARTICLE: 
+					case FUEL: 
+					case REPAIR_PACK: 
+					case POWERUP: 
+				}
+			}
+			if( i == OP->index ) break;
+			i = cycle( i + 1, 0, OBJ_PAGE_SIZE-1 );
+		}
+		OP = OP->next;
+	} while( OP != NULL );
+}
+
+void render_wrapping_objects( SDL_Renderer *R, OBJ_Page *OBJS, void *world_data, Transform *T ){
+
+	flat_world *fw = (flat_world*) world_data;
+
+	render_the_objects( R, OBJS, world_data, T );
+
+	if( fw->cwl ){// camera wrapping left
+		T->tx += fw->bounds.w;
+		update_TM( T, 0, 0, 0, 0 );
+
+		render_the_objects( R, OBJS, world_data, T );
+
+		T->tx -= fw->bounds.w;
+		update_TM( T, 0, 0, 0, 0 );
+	}
+
+	if( fw->cwr ){// camera wrapping right
+		T->tx -= fw->bounds.w;
+		update_TM( T, 0, 0, 0, 0 );
+
+		render_the_objects( R, OBJS, world_data, T );
+
+		T->tx += fw->bounds.w;
+		update_TM( T, 0, 0, 0, 0 );
+	}	
+}
+
 
 
 // ps: puffscale
@@ -650,6 +764,8 @@ void upon_a_sphere( SDL_Renderer *R, GameState *GS, char *spherepath ){
 	cpSpace *space;
 	space = cpSpaceNew();
 
+	cpSpaceSetSleepTimeThreshold( space, 1000 );
+
 	    cpCollisionHandler *ship_rock_CH = cpSpaceAddCollisionHandler( space, SHIP, ROCK );
 	         ship_rock_CH->postSolveFunc = ship_hurt;
 	cpCollisionHandler *ship_building_CH = cpSpaceAddCollisionHandler( space, SHIP, BUILDING );
@@ -674,6 +790,7 @@ void upon_a_sphere( SDL_Renderer *R, GameState *GS, char *spherepath ){
 
 	void *world_data = NULL;
 	render_world_func render_world = NULL;
+	render_objs_func render_objects = NULL;
 	world_bounding_func world_bounding = NULL;
 	gravitate_func gravitate = NULL;
 	inside_func inside = NULL;
@@ -683,6 +800,51 @@ void upon_a_sphere( SDL_Renderer *R, GameState *GS, char *spherepath ){
 	procedure destroy_world = NULL;
 
 	double grav_max = 0;
+
+
+
+	int ships_N = 1;
+	Ship_inst **ships = SDL_malloc( ships_N * sizeof(Ship_inst*) );
+
+	ships[0] = GS->hero_ship;
+	//cpVect p0 = cpBodyGetPosition( ships[0]->body ); SDL_Log("p0: %lg, %lg\n", xy(p0) );
+
+
+	OBJ_Page *OBJS = SDL_malloc( sizeof(OBJ_Page) );
+	init_OBJ_Page( OBJS );
+
+	SDL_Surface *smosurf = SDL_LoadPNG( "Classic/wavies.png" );
+	SDL_Texture *smokey_texture = SDL_CreateTextureFromSurface( R, smosurf );
+	SDL_DestroySurface( smosurf );
+
+    SDL_Texture *puff_mask = SDL_CreateTexture( R, SDL_PIXELFORMAT_RGBA8888,
+                                                SDL_TEXTUREACCESS_TARGET, GS->window_rct.w, GS->window_rct.h );
+
+    SDL_Texture *smoke_target = SDL_CreateTexture( R, SDL_PIXELFORMAT_RGBA8888,
+                                                   SDL_TEXTUREACCESS_TARGET, GS->window_rct.w, GS->window_rct.h );
+
+    /*SDL_SetRenderTarget( R, smokey_texture );
+	  SDL_SetRenderDrawColor( R, 0, 0, 0, 0 );
+	  SDL_RenderClear( R );
+	  SDL_SetRenderDrawColor( R, 255, 255, 255, 255 );
+	  for (int y = 0; y < GS->window_rct.h; y += 8 ){
+	  	//SDL_RenderLine( R, 0, y, GS->window_rct.w, y );
+	  	gp_draw_circle( R, GS->cx, GS->cy * 0.25, y );
+	  }
+	  SDL_SetRenderTarget( R, NULL );*/
+
+	float puffscale = 1;
+	Circle circumship0 = circumscribe_Path( &(ships[0]->data->physical[0].u.path) );
+	puffscale = circumship0.radius / 3.5; //heuristic!
+
+	Style bullet_style = { .stroke = 1,
+						   .stroke_color = Uint32_to_SDL_Color( 0xFFFF00FF ),
+						   .stroke_width = 1,
+						   .fill = 0,
+						   .fill_color = 0,
+						};
+
+
 
 	//SDL_Log( "loading Physical layer from file \"%s\".", spherepath );
 	SDL_IOStream *f = SDL_IOFromFile( spherepath, "r" );
@@ -743,10 +905,13 @@ void upon_a_sphere( SDL_Renderer *R, GameState *GS, char *spherepath ){
 		}
 	}
 
-	if( bounds.type == geo_BOX ){
+	if( bounds.type == geo_BOX ){ // THE WORLD IS FLAT!
 		bounds_rct = bounds.u.box;
-		init_flat_world( &world_data, bounds.u.box, gravity_falloff.u.box, map_visuals, GS->window_rct.w );
+		init_flat_world( &world_data, bounds.u.box, gravity_falloff.u.box, 
+						 map_visuals, GS->window_rct.w,
+						 puff_mask, puffscale, flat_world_bounding );
 		render_world = render_flat_world;
+		render_objects = render_wrapping_objects;
 		world_bounding = flat_world_bounding;
 		gravitate = flat_world_gravitate;
 		inside = inside_flat_world;
@@ -770,13 +935,17 @@ void upon_a_sphere( SDL_Renderer *R, GameState *GS, char *spherepath ){
 		}
 		SDL_Log("spawn: %lg, %lg\n", xy(spawn) );
 	}
-	else if( bounds.type == geo_CIRCLE ){
+
+	else if( bounds.type == geo_CIRCLE ){// THE WORLD IS ROUND!
+
 		bounds_rct = (SDL_FRect){  -(bounds.u.circle.radius),  -(bounds.u.circle.radius),
 								  2*(bounds.u.circle.radius), 2*(bounds.u.circle.radius) };
 		double srad = 0;
 		if( gravity_falloff.type == geo_CIRCLE ) srad = gravity_falloff.u.circle.radius;
-		init_round_world( &world_data, bounds.u.circle.radius, srad );
+		init_round_world( &world_data, bounds.u.circle.radius, srad,
+						 puff_mask, puffscale, round_world_bounding );
 		render_world = render_round_world;
+		render_objects = render_the_objects;
 		world_bounding = round_world_bounding;
 		if( gravity_falloff.type == geo_CIRCLE ){
 			gravitate = round_world_gravitate;
@@ -810,6 +979,9 @@ void upon_a_sphere( SDL_Renderer *R, GameState *GS, char *spherepath ){
 		}
 	}
 
+
+	init_ship_physics( ships[0], space, spawn );
+
 	SVG_Layer_destroy( ZL );
 
 	//cpSpaceSetGravity( space, cpv(0, 10) );
@@ -820,47 +992,6 @@ void upon_a_sphere( SDL_Renderer *R, GameState *GS, char *spherepath ){
 
 	SDL_CloseIO( f );
 
-	int ships_N = 1;
-	Ship_inst **ships = SDL_malloc( ships_N * sizeof(Ship_inst*) );
-
-	ships[0] = GS->hero_ship;
-	init_ship_physics( ships[0], space, spawn );
-	//cpVect p0 = cpBodyGetPosition( ships[0]->body ); SDL_Log("p0: %lg, %lg\n", xy(p0) );
-
-
-	OBJ_Page *OBJS = SDL_malloc( sizeof(OBJ_Page) );
-	init_OBJ_Page( OBJS );
-
-	SDL_Surface *smosurf = SDL_LoadPNG( "Classic/wavies.png" );
-	SDL_Texture *smokey_texture = SDL_CreateTextureFromSurface( R, smosurf );
-	SDL_DestroySurface( smosurf );
-
-    SDL_Texture *puff_mask = SDL_CreateTexture( R, SDL_PIXELFORMAT_RGBA8888,
-                                                SDL_TEXTUREACCESS_TARGET, GS->window_rct.w, GS->window_rct.h );
-
-    SDL_Texture *smoke_target = SDL_CreateTexture( R, SDL_PIXELFORMAT_RGBA8888,
-                                                   SDL_TEXTUREACCESS_TARGET, GS->window_rct.w, GS->window_rct.h );
-
-    /*SDL_SetRenderTarget( R, smokey_texture );
-	  SDL_SetRenderDrawColor( R, 0, 0, 0, 0 );
-	  SDL_RenderClear( R );
-	  SDL_SetRenderDrawColor( R, 255, 255, 255, 255 );
-	  for (int y = 0; y < GS->window_rct.h; y += 8 ){
-	  	//SDL_RenderLine( R, 0, y, GS->window_rct.w, y );
-	  	gp_draw_circle( R, GS->cx, GS->cy * 0.25, y );
-	  }
-	  SDL_SetRenderTarget( R, NULL );*/
-
-	float puffscale = 1;
-	Circle circumship0 = circumscribe_Path( &(ships[0]->data->physical[0].u.path) );
-	puffscale = circumship0.radius / 3.5; //heuristic!
-
-	Style bullet_style = { .stroke = 1,
-						   .stroke_color = Uint32_to_SDL_Color( 0xFFFF00FF ),
-						   .stroke_width = 1,
-						   .fill = 0,
-						   .fill_color = 0,
-						};
 	
 
 	int longest_path = 0;
@@ -925,12 +1056,13 @@ void upon_a_sphere( SDL_Renderer *R, GameState *GS, char *spherepath ){
 							debug_view = !debug_view;
 							//SDL_Log( "T = { %lg, %lg,  %g, %g,  %g }", T.tx, T.ty, T.cx, T.cy, T.s );
 						}
+						/*
 						else if( event.key.key == SDLK_P ){
 							SDL_Log("exporting textures...");
 							save_texture("puff_mask.png", R, puff_mask);
 							save_texture("smokey_texture.png", R, smokey_texture);
 							save_texture("smoke_target.png", R, smoke_target);
-						} 
+						}*/
 						break;
 
 					case SDL_EVENT_GAMEPAD_AXIS_MOTION:
@@ -1001,7 +1133,7 @@ void upon_a_sphere( SDL_Renderer *R, GameState *GS, char *spherepath ){
 			goto end;
 		}
 		
-		update_camera( &T, p1pos, &world_angle, GS->window_rct, bounds_rct );
+		update_camera( world_data, &T, p1pos, &world_angle, GS->window_rct, bounds_rct );
 		Mat23 WT = T.M;
 
 		SDL_SetRenderDrawColor( R, 2, 2, 2, 255 );
@@ -1052,42 +1184,12 @@ void upon_a_sphere( SDL_Renderer *R, GameState *GS, char *spherepath ){
 		}
 		T.M = WT;// reset for next step
 
-
 		// -- Objects tick -- 
 		OBJ_Page *OP = OBJS;
 		do{
 			int i = OP->oldest;
 			for( int c = 0; c < OBJ_PAGE_SIZE; ++c ){
-
 				if( OP->objs[i].type != EMPTY ){
-
-					switch( OP->objs[i].type ){
-
-						case SMOKE:{
-							ageing_body* ab = (ageing_body*)(OP->objs[i].data);
-							cpVect obpos = cpBodyGetPosition( ab->body );
-							SDL_SetRenderTarget( R, puff_mask );
-							SDL_SetRenderDrawColor( R, 255, 255, 255, 
-								                    constrain( map(ab->age, 0, 35, 0, 255), 0, 255) );
-							TM_APPLY_TO( obpos, obpos, T.M );
-							gp_fill_8circle( R, obpos.x, obpos.y, T.s * 1.8 * puffscale );
-							SDL_SetRenderTarget( R, NULL );
-							} break;
-
-						case BULLET:{
-							styled_body *sb = (styled_body*)(OP->objs[i].data);
-							world_bounding( world_data, sb->body );
-							SDL_SetRenderDraw_SDL_Color( R, sb->style->stroke_color );
-							stroke_cpBody( R, sb->body, &T );
-							} break;
-
-						case ROCK: 
-						case PARTICLE: 
-						case FUEL: 
-						case REPAIR_PACK: 
-						case POWERUP: 
-					}
-
 					if( OP->objs[i].tick( OP->objs + i ) ){
 						OBJ_expired( OP, i );
 					}
@@ -1098,6 +1200,9 @@ void upon_a_sphere( SDL_Renderer *R, GameState *GS, char *spherepath ){
 			OP = OP->next;
 		} while( OP != NULL );
 
+		render_objects( R, OBJS, world_data, &T );
+
+
 		RenderCopyMasked( R, smokey_texture, puff_mask, smoke_target );
 		fade_Texture( R, puff_mask, 225 );
 
@@ -1105,8 +1210,9 @@ void upon_a_sphere( SDL_Renderer *R, GameState *GS, char *spherepath ){
 
 		// -- HP bar ---
 		SDL_SetRenderDrawColor( R, 40, 255, 40, 255 );
-		SDL_RenderRect( R, &(SDL_FRect){ 10, 60, 180, 40 } );
-		SDL_RenderFillRect( R, &(SDL_FRect){ 15, 65, map(ships[0]->hull, 0, ships[0]->data->hull_max, 0, 170), 30 } );
+		SDL_RenderRect( R, &(SDL_FRect){ 10, 60, 200, 30 } );
+		float hull_w = cmap(ships[0]->hull, 0, ships[0]->data->hull_max, 0, 190);
+		SDL_RenderFillRect( R, &(SDL_FRect){ 15, 65, hull_w, 20 } );
 
 		
 

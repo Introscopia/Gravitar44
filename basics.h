@@ -110,6 +110,7 @@ uint32_t pcg_random( PCG_RNG* rng );
 double lerp(double start, double stop, double amt);
 
 double /*linear*/map(double value, double source_lo, double source_hi, double dest_lo, double dest_hi);
+double          cmap(double value, double source_lo, double source_hi, double dest_lo, double dest_hi);
 double ellipticalMap(double value, double source_lo, double source_hi, double dest_lo, double dest_hi);
 double    sigmoidMap(double value, double source_lo, double source_hi, double dest_lo, double dest_hi);
 double advSigmoidMap(double value, double source_lo, double source_hi, double Slo, double Shi, double dest_lo, double dest_hi);

@@ -40,8 +40,15 @@ Copyright (c) 2026 Introscopia
       Software, offering it as part of a paid product, or using it
       in a commercial game without a separate written agreement.
 
-   The above restrictions (in particular, the non‑commercial condition)
-   apply until the later of the following two events (the "Expiry Date"):
+   c) Share‑Alike (Copyleft) – If you distribute or make available any
+      work that is based on, derived from, or incorporates the Software
+      (in whole or in part), you must license the entire such work under
+      the terms of this License. You may not impose any additional
+      restrictions that would prevent recipients from exercising the
+      rights granted here.
+
+   The above restrictions apply until the later of the following 
+   two events (the "Expiry Date"):
 
       - 31 December 2030, 23:59 UTC, or
       - The death of the original author.
@@ -53,8 +60,8 @@ Copyright (c) 2026 Introscopia
 2. Post‑Expiry License
 
    After the Expiry Date, the non‑commercial restriction in Section 1(b)
-   is permanently lifted. The remaining terms – particularly the
-   attribution requirement of Section 1(a) – continue to apply
+   is permanently lifted. The remaining terms, 1(a) the attribution 
+   requirement, and 1(c) Share‑Alike (Copyleft), continue to apply
    indefinitely. You may then use the Software for any purpose, including
    commercial purposes, provided that you still give attribution as
    described above.

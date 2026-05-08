@@ -104,12 +104,17 @@ void load_doodads( char *filename, Library *lib );
 
 
 typedef void (*world_bounding_func)( void *W, cpBody *b );
-typedef void (*update_camera_func)( Transform *T, cpVect target, double *world_angle, SDL_FRect window_rct, SDL_FRect bounds );
+typedef void (*update_camera_func)( void *W, Transform *T, cpVect target, double *world_angle, SDL_FRect window_rct, SDL_FRect bounds );
 typedef void (*render_world_func)( SDL_Renderer *R, void *W, Styled_Geo *map_visuals, Transform *T, SDL_FPoint *vbuf );
+typedef void (*render_objs_func)( SDL_Renderer *R, OBJ_Page *OBJS, void *world_data, Transform *T );
 typedef void (*gravitate_func)( void *W, cpBody *body, double force );
 typedef bool (*inside_func)( void *W, cpVect p );
 
+#define FLAT 77
+
 typedef struct{
+
+	int morphology;
 
 	SDL_FRect bounds;
 	SDL_FRect gravity_falloff;
@@ -122,9 +127,24 @@ typedef struct{
 	size_t deja_size;
 	Sint8 *deja_rendu;
 
+	// this frame:
+	// viewport left/right
+	float vpl, vpr;
+	// camera wrapping left/right
+	bool cwl, cwr;
+
+	//we bring these along for the ride to fascilitate access for some funcs.
+	SDL_Texture *puff_mask; 
+	float puffscale;
+	world_bounding_func world_bounding;
+
 } flat_world;
 
+#define ROUND 88
+
 typedef struct{
+
+	int morphology;
 
 	double bounds; //radius
 	double bounds_sq;
@@ -132,6 +152,9 @@ typedef struct{
 	double surface_radsq;
 	double surface_radcubed;
 
+	SDL_Texture *puff_mask; 
+	float puffscale;
+	world_bounding_func world_bounding;
 
 } round_world;
 
