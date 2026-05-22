@@ -41,7 +41,7 @@ bool line_intersection(float x0, float y0, float x1, float y1,
 	s = (-s1y * (x0 - x2) + s1x * (y0 - y2)) / (-s2x * s1y + s1x * s2y);
 	t = ( s2x * (y0 - y2) - s2y * (x0 - x2)) / (-s2x * s1y + s1x * s2y);
 
-	if ( (s == 0 || s == 1) && (t == 0 || t == 1) ){     
+	if ( (s >= 0.001 && s <= 0.999) && (t >= 0.001 && t <= 0.999) ){
 		if (ix != NULL) *ix = x0 + (t * s1x);
 		if (iy != NULL) *iy = y0 + (t * s1y);
 		return 1;

@@ -7,6 +7,7 @@
 * time factor, sim iterations
 * cycle smoke fx { none * stripey * solid }
 * Select player color! / game palettes!
+* Enemies drop repair, fuel
 
 -- EXTRAS --
 Homebase, get fixed up, get fuel
@@ -14,10 +15,29 @@ Steal the reactor from NOVA, bring it back to homebase
 
 */
 #include <SDL.h>
+//#include <SDL_image.h>
 #include "basics.h"
 #include "game.h"
 #include "cvec.h"
+#include "Vector_Font.h"
 
+
+
+int *verts_below( Glyph *G, int Y ){
+	int *verts = NULL;
+	int total_verts = G->offsets[ G->path_count -1 ];
+	for (int i = 0; i < total_verts; ++i ){
+		if( G->verts[i].y > Y ){
+			vec_push( verts, i );
+		}
+	}
+	return verts;
+}
+
+double bell_curve( double x ){
+	double y = 1.0 / sq( 10*sq(x) + 1 );
+	return y;
+}
 
 
 
@@ -61,6 +81,138 @@ int main(int argc, char *argv[]){
 	int moment = 1;
 
 	SDL_srand(0);
+
+	VFont grav_font = load_VFont( "data/GRAV.bin" );
+	grav_font.scale = 10;
+	float fch = grav_font.line_height * grav_font.scale;
+	float gfhl = fch * 0.5;
+
+	VFont square_font = load_VFont( "data/5by7.bin" );
+	square_font.scale = 3;
+	float sfch = square_font.line_height * square_font.scale;
+
+	float rad = width * 0.5 * 0.4;
+	float yoff = height * 0.65;//height + 125;
+	float zoff = 1.12;
+	float yhead = -0.1;//*PI;
+	float xhead = HALF_PI;
+	float xarc = 0.15*PI;
+	float yarc = 0.027*PI;
+
+	SDL_Log( "%g, %g, %g, %g, %g", rad, yoff, zoff, yhead, xhead );
+
+	char titlestr [] = "GRAVITAR+44";
+
+	Glyph titlestr_consolidated = VCT_consolidate_string( &grav_font, titlestr );
+	Paths3D titlestr_3D = Paths3D_from_consolidated_glyph( &titlestr_consolidated );
+
+	int title_mode = 1;
+
+	int *tsc_bottoms = verts_below( &titlestr_consolidated, grav_font.scale*8 );
+
+	float title_radii [11];
+	float rtimer = -4;
+	float deltart = 0.01;
+
+	// -- MAIN MENU	--
+	while(loop){
+
+		SDL_Event event;
+		while( SDL_PollEvent(&event) ){
+			switch (event.type) {
+				case SDL_EVENT_QUIT:
+					goto quitting;
+
+				case SDL_EVENT_KEY_UP:
+					if( event.key.key == SDLK_LEFT ){
+						yhead -= 0.02;
+					}
+					else if( event.key.key == SDLK_RIGHT ){
+						yhead += 0.02;
+					}
+					else if( event.key.key == SDLK_UP ){
+						zoff += 0.02;
+					}
+					else if( event.key.key == SDLK_DOWN ){
+						zoff -= 0.02;
+					}
+					else if( event.key.key == ',' ){
+						rad -= 5;
+					}
+					else if( event.key.key == '.' ){
+						rad += 5;
+					}
+					else{
+						loop = 0;
+					}
+					break;
+			}
+		}
+
+		SDL_SetRenderDrawColor( R, 0, 0, 0, 255 );
+		SDL_RenderClear( R );
+
+		
+		SDL_SetRenderDrawColor( R, 200, 200, 200, 255 );
+		SDL_RenderDebugTextFormat( R, 10, 10, "rad: %g, yh: %g, zo: %g", rad, yhead, zoff );
+	
+
+		// WAVE MODE
+		if( title_mode == 1 ){
+			for (int i = 0; i < 11; ++i ){
+				title_radii[ i ] = rad * map( bell_curve( rtimer - (i * 0.1) ), 0, 1, 1, 0.2 );
+				//SDL_Log("title_radii[ %d ]: %g\n", i, title_radii[ i ] );
+			}
+			rtimer += deltart;
+			if( rtimer > 4 ) deltart *= -1;
+			else if( rtimer < -4 ){
+				deltart *= -1;
+				if( SDL_rand(10) <= 5 ){
+					title_mode = 2;
+				}
+			}
+	
+			VCT_project_string_on_a_Ball_w_radii( &titlestr_3D, &grav_font, titlestr, 
+									   		      title_radii, xhead, xarc, yhead, yarc, zoff );
+		}
+		// SPIN MODE
+		else if( title_mode == 2 ){
+			VCT_project_string_on_a_Ball( &titlestr_3D, &titlestr_consolidated, fch,
+									  rad, xhead, xarc, yhead, yarc, zoff );
+			xhead += 0.004;
+			if( xhead > 2.5 * PI ){
+				title_mode = 1;
+				xhead = HALF_PI;
+			}
+		}
+
+		SDL_SetRenderDrawColor( R, 255, 20, 20, 255 );
+		for( int b = 0; b < vec_size(tsc_bottoms); ++b ){
+			int i = tsc_bottoms[ b ];
+			float x =   cx + ( titlestr_3D.verts[ i ].x / titlestr_3D.verts[ i ].z );
+			float y = yoff + ( titlestr_3D.verts[ i ].y / titlestr_3D.verts[ i ].z );
+			SDL_RenderLine( R, cx, height * 0.65, x, y );
+		}
+
+		SDL_SetRenderDrawColor( R, 20, 20, 255, 255 );
+		draw_Paths3D( R, &titlestr_3D, cx, yoff );
+
+		SDL_SetRenderDrawColor( R, 220, 220, 220, 255 );
+		VCT_render_string_wrapped_aligned( R, &square_font, "- INTROSCOPIA * 2026 -", 
+			                               0, height-(2*sfch), width, VCT_ALIGN_CENTER );
+
+		//VCT_render_string_wrapped_aligned( R, &grav_font, titlestr, 0, cy+200, width, VCT_ALIGN_CENTER );
+
+		SDL_RenderPresent( R );
+		SDL_framerateDelay(17);
+	}
+
+
+	SDL_free( titlestr_consolidated.offsets );
+	SDL_free( titlestr_consolidated.verts );
+	SDL_free( titlestr_3D.verts );
+
+
 	
 	GameState GS;
 
@@ -111,7 +263,7 @@ int main(int argc, char *argv[]){
 		if( GS.lib.doodads[i].type == SHIP &&
 			SDL_strcmp( GS.lib.doodads[i].name, "Hero" ) == 0 ){
 			GS.hero_ship = instantiate_ship( &(GS.lib.doodads[i].u.ship) );
-			GS.hero_ship->gun_cooldown = 333;
+			GS.hero_ship->gun_cooldown = 275;
 			SDL_Log( "found the Hero, instantiated it" );
 			break;
 		}
@@ -150,75 +302,7 @@ int main(int argc, char *argv[]){
 
 	}
 
-	/*
-	SDL_Log("<<<Entering Main Loop>>>");
-	while ( loop ) {//%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% /LOOP %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%|||
-
-		SDL_Event event;
-		while( SDL_PollEvent(&event) ){
-
-			//UI_event_handling_function( &main_menu, &event );
-
-			switch (event.type) {
-				case SDL_EVENT_QUIT:
-					loop = 0;
-					break;
-				case SDL_EVENT_MOUSE_MOTION:
-					mouse = cpv(event.motion.x, event.motion.y);
-					break;
-				case SDL_EVENT_MOUSE_BUTTON_DOWN:
-					
-					break;
-				case SDL_EVENT_MOUSE_BUTTON_UP:
-					
-					break;
-				case SDL_EVENT_KEY_DOWN:
-					break;
-				case SDL_EVENT_KEY_UP:;
-					
-					break;
-				case SDL_EVENT_MOUSE_WHEEL:;
-
-
-					break;
-			}
-		}
-
-		
-		SDL_SetRenderDrawColor( R, color_scheme[0].r, color_scheme[0].g, color_scheme[0].b, color_scheme[0].a );
-		SDL_RenderClear( R );
-
-		//moment = 1;
-        switch( moment ){
-            case 0:
-                //UI_display( R, &main_menu );
-                break;
-            case 1:
-                //the_game( R, &loop, width, height, &fpsm );
-                moment = 0;
-                break;
-            case 2:
-               	//options( R, &loop, width, height );
-                moment = 0;
-                break;
-            case 3:
-                loop = 0;
-                break;
-        }
-
-        //SDL_SetRenderDrawColor( R, 0, 24, 222, 255 );
-		//SDL_RenderRect( R, &(SDL_Rect){ vertices[0].x -2, vertices[0].y -2, 4, 4 } );
-
-
-
-		SDL_RenderPresent( R );
-
-
-
-		SDL_framerateDelay(16);
-	}//%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% /LOOP %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%|||
-	*/
-	//SDL_DestroyTexture( T );
+	quitting:
 
 	SDL_DestroyRenderer(R);
 	SDL_Quit();

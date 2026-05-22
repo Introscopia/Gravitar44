@@ -76,12 +76,15 @@ static vec2d* load_svg_path_d( SDL_IOStream *f, int *length, bool *close ) {
 			if( c == 'M' || c == 'm' || //move to
 				c == 'L' || c == 'l' || //line to
 				c == 'H' || c == 'h' || //horizontal line
-				c == 'V' || c == 'v' || //vertical line
+				c == 'V' || c == 'v' ){ //vertical line
+					command = c;
+			}
+			else if (
 				c == 'C' || c == 'c' || //Cubic Bézier
 				c == 'S' || c == 's' || //Also Cubic Bézier, but first control point is a reflection of the second control point.
 				c == 'Q' || c == 'q' || //Quadratic Bézier
 				c == 'T' || c == 't' ){ //Also Quadratic Bézier but the control point is a reflection of the control on the previously listed command relative to the start point of the new T or t command.
-
+				SDL_Log( "BEZIER!!!! ->%c<-", c );
 				command = c;
 			}
 			else if( c == 'Z' || c == 'z' ){

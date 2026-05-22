@@ -1917,6 +1917,25 @@ uint32_t binary_code_point( int bytes, uint32_t key ){
 			return key;
 	}
 }
+
+Uint32 utf8_to_codepoint( unsigned char *string ){
+
+	Uint32 codepoint = 0;
+	if (string[0] <= 0x7F) {
+	    codepoint = string[0];
+	}
+	else if ((string[0] & 0xE0) == 0xC0) {
+	    codepoint = ((string[0] & 0x1F) << 6) | (string[1] & 0x3F);
+	}
+	else if ((string[0] & 0xF0) == 0xE0) {
+	    codepoint = ((string[0] & 0x0F) << 12) | ((string[1] & 0x3F) << 6) | (string[2] & 0x3F);
+	}
+	else if ((string[0] & 0xF8) == 0xF0) {
+	    codepoint = ((string[0] & 0x07) << 18) | ((string[1] & 0x3F) << 12) | ((string[2] & 0x3F) << 6) | (string[3] & 0x3F);
+	}
+	return codepoint;
+}
+
 size_t utf8_strlen(const char *s) {
 	size_t count = 0;
 	while (*s) {
@@ -2035,7 +2054,7 @@ void SDL_framerate_limit_n_monitor(SDL_Renderer *R, int frame_period) {
     char buf[64];
     float idle_pct = ((frame_period - avg) / frame_period ) * 100.0;
     SDL_snprintf( buf, sizeof(buf), "%.1f fps (%+.1f%%) f:%d", fps, idle_pct, elapsed );
-    SDL_RenderDebugText(R, 20, 20, buf);
+    SDL_RenderDebugText(R, 550, 20, buf);
 }
 
 

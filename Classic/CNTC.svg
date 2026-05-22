@@ -23,9 +23,9 @@
      showgrid="false"
      showborder="false"
      showguides="true"
-     inkscape:zoom="0.10429825"
-     inkscape:cx="2243.5659"
-     inkscape:cy="-1025.9041"
+     inkscape:zoom="0.850731"
+     inkscape:cx="3781.4538"
+     inkscape:cy="-85.808557"
      inkscape:window-width="1366"
      inkscape:window-height="697"
      inkscape:window-x="-8"
@@ -842,7 +842,7 @@
        sodipodi:nodetypes="ccccccc" />
     <path
        style="fill:#d2fff6;fill-opacity:0.37276;stroke:#d2fff6;stroke-linejoin:round;stroke-opacity:1;paint-order:markers fill stroke"
-       d="m 3900,0 -63,-128 c 0,0 64,-160 64,-160 l 64,160 z"
+       d="m 3900,0 -63,-128 64,-160 64,160 z"
        id="path1841" />
     <path
        style="fill:#d2fff6;fill-opacity:0.37276;stroke:#d2fff6;stroke-linejoin:round;stroke-opacity:1;paint-order:markers fill stroke"
@@ -896,7 +896,9 @@
   <g
      inkscape:groupmode="layer"
      id="layer2"
-     inkscape:label="Visual">
+     inkscape:label="Visual"
+     sodipodi:insensitive="true"
+     style="display:none">
     <path
        style="fill:none;fill-opacity:0.189964;stroke:#00ff00;stroke-linejoin:round;stroke-opacity:1;paint-order:markers fill stroke"
        d="m -1,-608 h 128 l 64,160 64,-160 h 127 l 64,96 64,-96 h 512 l -64,-64 H -1"
@@ -921,16 +923,18 @@
   <g
      inkscape:groupmode="layer"
      id="layer4"
-     inkscape:label="Zones">
+     inkscape:label="Zones"
+     style="display:none"
+     sodipodi:insensitive="true">
     <rect
-       style="fill:#d2fff6;fill-opacity:0.12903225;stroke:none;stroke-linejoin:round;stroke-opacity:1;paint-order:markers fill stroke"
+       style="fill:#d2fff6;fill-opacity:0.129032;stroke:none;stroke-linejoin:round;stroke-opacity:1;paint-order:markers fill stroke"
        id="bounds"
        width="4093"
        height="2486.0388"
        x="0"
        y="-2186.0386" />
     <rect
-       style="fill:#d2be48;fill-opacity:0.12903225;stroke:none;stroke-linejoin:round;stroke-opacity:1;paint-order:markers fill stroke"
+       style="fill:#d2be48;fill-opacity:0.129032;stroke:none;stroke-linejoin:round;stroke-opacity:1;paint-order:markers fill stroke"
        id="gravity_falloff"
        width="4093"
        height="1744.9961"

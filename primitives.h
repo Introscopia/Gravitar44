@@ -12,6 +12,8 @@ void gp_draw_arrow( SDL_Renderer *R, float ax, float ay, float bx, float by, flo
 																//line thickness, head base, head height
 void gp_draw_bezier1( SDL_Renderer *renderer, vec2d *a1, vec2d *a2, vec2d *c, int res );
 void gp_draw_bezier2( SDL_Renderer *renderer, vec2d *a1, vec2d *a2, vec2d *c1, vec2d *c2, int res );
+
+void gp_fill_diamond(SDL_Renderer *R, float x, float y, float radius);
                                                               
 void gp_draw_circle( SDL_Renderer *R, float x, float y, float radius );
 void gp_fill_circle( SDL_Renderer *R, float x, float y, float radius );

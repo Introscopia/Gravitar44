@@ -15,6 +15,41 @@ cpVect cpv_rottrig( cpVect v, vec2d trig );
 
 #define v2d_to_cpv( V2D ) cpv(V2D.x,V2D.y)
 
+
+/*	...code_alphabetical_bit...
+	a
+	b - bullets
+	c - 
+	d - 
+	e - Exhaust, effects
+	f - 
+	g - 
+	h - 
+	i - 
+	j - 
+	k - 
+	l - 
+	m - 
+	n - 
+	o - 
+	p - particles
+	q - 
+	r - rock
+	s - Solid, static
+	t - 
+	u - 
+	v - Vessels
+	w - 
+	x - 
+	y - 
+	z - 
+	A - 
+	B - 
+	C - 
+	D - 
+	E - 
+	F - 
+*/
 cpBitmask de_mask( char *code );
 void en_mask( cpBitmask mask, char *code );
 
@@ -44,6 +79,12 @@ cpShape *Geometric_to_cpShape( Geometric *geo, cpBody *body, float stroke_width 
 
 int SVG_layer_into_cpSpace( SVG_Layer *layer, cpSpace *space, bool physical_stroke, int CT );
 
+
+typedef struct bullet_impact_struct{
+	int type;
+	cpVect pos;
+	cpVect imp;
+} bullet_impact;
 
 void ship_hurt( cpArbiter *arb, cpSpace *space, void *unused );
 void ship_kamikaze( cpArbiter *arb, cpSpace *space, void *unused );

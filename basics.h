@@ -287,6 +287,7 @@ bool f_check( char c );
 int bytes_in_a_utf_codepoint( uint8_t ch );
 int retrobytes_in_a_utf_codepoint( const char *str );
 uint32_t binary_code_point( int bytes, uint32_t key );
+Uint32 utf8_to_codepoint( unsigned char *string );
 size_t utf8_strlen(const char *s);
 uint32_t UTF8_to_UINT32( char *str, int *bytes, int endianness );
 //returns the number of bytes written into str.

@@ -20,40 +20,6 @@ cpVect cpv_rottrig( cpVect v, vec2d trig ){
     return v;
 }
 
-/*	...code_alphabetical_bit...
-	a
-	b - bullets
-	c - 
-	d - 
-	e - Exhaust, effects
-	f - 
-	g - 
-	h - 
-	i - 
-	j - 
-	k - 
-	l - 
-	m - 
-	n - 
-	o - 
-	p - 
-	q - 
-	r - 
-	s - Solid, static
-	t - terrain
-	u - 
-	v - Vessels
-	w - 
-	x - 
-	y - 
-	z - 
-	A - 
-	B - 
-	C - 
-	D - 
-	E - 
-	F - 
-*/
 cpBitmask de_mask( char *code ){
 
 	if( SDL_strcmp( code, "ALL" ) == 0 ) return CP_ALL_CATEGORIES;
@@ -426,6 +392,17 @@ void sbod_down( cpArbiter *arb, cpSpace *space, void *unused ){
 	OBJ *O = cpShapeGetUserData( a );
 	styled_body* sb = (styled_body*)(O->data);
 	sb->status = 1;
+
+	bullet_impact *bimp = SDL_malloc( sizeof(bullet_impact) );
+	bimp->type = BULLET;
+	if( cpArbiterGetCount(arb) > 0 ){
+		bimp->pos = cpArbiterGetPointA( arb, 0 );//cpBodyLocalToWorld( arb->body_a, arb->contacts[0].r1 );//
+	} else {
+		bimp->pos = cpBodyGetPosition( arb->body_a );
+	}
+	bimp->imp = cpArbiterTotalImpulse( arb );
+	void ***signal_queue = cpSpaceGetUserData( space );
+	vec_push( *signal_queue, bimp );
 }
 
 

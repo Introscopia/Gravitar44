@@ -21,9 +21,9 @@
      inkscape:pagecheckerboard="0"
      inkscape:deskcolor="#000000"
      showgrid="false"
-     inkscape:zoom="0.1475"
-     inkscape:cx="-410.16949"
-     inkscape:cy="176.27119"
+     inkscape:zoom="1.2207829"
+     inkscape:cx="-998.12998"
+     inkscape:cy="21.297808"
      inkscape:window-width="1366"
      inkscape:window-height="697"
      inkscape:window-x="-8"
@@ -488,14 +488,14 @@
      id="layer3"
      inkscape:label="Physical"
      style="display:inline"
-     gravity="35000000">
+     gravity="31500000">
     <path
        style="fill:#9cdbee;fill-opacity:0.6;stroke:#9cdbee;stroke-linejoin:round;stroke-opacity:1;paint-order:markers fill stroke"
        d="m -377.7332,-501.93864 96.00006,-95.99993 127.99994,128 -128,63.99993 z"
        id="path1168" />
     <path
        style="fill:#9cdbee;fill-opacity:0.6;stroke:#9cdbee;stroke-linejoin:round;stroke-opacity:1;paint-order:markers fill stroke"
-       d="m -857.7332,-21.938573 h -192 l 128,128.000003 h 128 c 0,0 -64,-128.000003 -64,-128.000003 z"
+       d="m -857.7332,-21.938573 h -192 l 128,128.000003 h 128 z"
        id="path2034" />
     <path
        style="fill:#9cdbee;fill-opacity:0.6;stroke:#9cdbee;stroke-linejoin:round;stroke-opacity:1;paint-order:markers fill stroke"

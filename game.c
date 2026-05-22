@@ -526,6 +526,7 @@ bool inside_flat_world( void *W, cpVect p ){
 void init_round_world( void **W, double brad, double srad, 
 					  SDL_Texture *puff_mask, float puffscale, world_bounding_func world_bounding ){
 	*W = SDL_malloc( sizeof(round_world) );
+	SDL_Log("*W: %p, size: %zd\n", *W, sizeof(round_world) );
 	round_world *rw = (round_world*)(*W);
 	rw->morphology = ROUND;
 	rw->bounds = brad;
@@ -539,6 +540,7 @@ void init_round_world( void **W, double brad, double srad,
 }
 void destroy_round_world( void *W ){
 	//round_world *rw = (round_world*) W;
+	SDL_Log("W: %p, %zd\n", W, sizeof(round_world) );
 	SDL_free( W );
 }
 void round_world_bounding( void *W, cpBody *b ){
@@ -561,6 +563,12 @@ void round_world_update_camera( void *W, Transform *T, cpVect target, double *wo
 	}
 
 	update_TM_world_rotated( T, *world_angle, 0, 0, 0 );
+}
+void fixed_world_update_camera( void *W, Transform *T, cpVect target, double *world_angle, 
+	                            SDL_FRect window_rct, SDL_FRect bounds ){
+	T->tx = target.x * 0.66;
+	T->ty = target.y * 0.66;
+	update_TM( T, 0, 0, 0, 0 );
 }
 void render_round_world( SDL_Renderer *R, void *W, Styled_Geo *map_visuals, Transform *T, SDL_FPoint *vbuf ){
 	round_world *rw = (round_world*) W;
@@ -641,7 +649,14 @@ void render_the_objects( SDL_Renderer *R, OBJ_Page *OBJS, void *world_data, Tran
 						stroke_cpBody( R, sb->body, T );
 						} break;
 
-					case PARTICLE: 
+					case PARTICLE:{
+						ageing_body* ab = (ageing_body*)(OP->objs[i].data);
+						cpVect obpos = cpBodyGetPosition( ab->body );
+						TM_APPLY_TO( obpos, obpos, T->M );
+						SDL_SetRenderDrawColor( R, 40, 255, 255, 255 );
+						SDL_RenderRect( R, &(SDL_FRect){obpos.x, obpos.y, 2, 2} );
+						} break;
+
 					case FUEL: 
 					case REPAIR_PACK: 
 					case POWERUP: 
@@ -707,7 +722,7 @@ void create_smokepuff( cpSpace *space, OBJ *O, float ps, cpVect pos, cpVect vel 
 	cpBodySetVelocityUpdateFunc( body, cpBodyUpdateVelocity_NoGravity );
 	cpSpaceAddShape( space, shape );
 	cpShapeSet_DEF( shape, 0.001, 0.8, 0.04 );
-	cpShapeFilter filter = cpShapeFilterNew( 0, de_mask( "e" ), de_mask( "est" ) );
+	cpShapeFilter filter = cpShapeFilterNew( 0, de_mask( "e" ), de_mask( "ers" ) );
 	cpShapeSetFilter( shape, filter );
 	cpShapeSetCollisionType( shape, SMOKE );
 	cpShapeSetUserData( shape, (cpDataPointer)O );
@@ -716,7 +731,7 @@ void create_smokepuff( cpSpace *space, OBJ *O, float ps, cpVect pos, cpVect vel 
 	O->data = SDL_calloc( 1, sizeof(ageing_body) );
 	ageing_body* ab = (ageing_body*)(O->data);
 	ab->body = body;
-	ab->age = randomI( 35, 50 );
+	ab->age = randomI( 45, 60 );
 	O->tick = ageing_body_tick;
 	O->destroy = destroy_ageing_body;
 }
@@ -734,7 +749,7 @@ void create_bullet( cpSpace *space, OBJ *O, cpVect pos, cpVect vel, double headi
 	cpShapeSetDensity( shape, 0.07 );
 	cpShapeSetElasticity( shape, 0.66 );
 	cpShapeSetFriction( shape, 0.04 );
-	cpShapeFilter filter = cpShapeFilterNew( 0, de_mask( "b" ), de_mask( "bstv" ) );
+	cpShapeFilter filter = cpShapeFilterNew( 0, de_mask( "b" ), de_mask( "brsv" ) );
 	cpShapeSetFilter( shape, filter );
 	cpShapeSetCollisionType( shape, BULLET );
 	cpShapeSetUserData( shape, (cpDataPointer)O );
@@ -750,7 +765,35 @@ void create_bullet( cpSpace *space, OBJ *O, cpVect pos, cpVect vel, double headi
 }
 
 
+void create_particle( cpSpace *space, OBJ *O, cpVect pos, cpVect vel ){
 
+	cpBody *body = cpSpaceAddBody( space, cpBodyNew(0, 0) );
+	cpBodySetPosition( body, pos );
+	double vm = cpvlength(vel);
+	double va = cpvtoangle(vel);
+	double deviance = randomF( -SIXTH_PI, SIXTH_PI );
+	va += deviance;
+	vm *= 1 - ( SDL_fabs( deviance ) / SIXTH_PI );
+	cpVect nvel = cpv_polar( vm, va );
+	cpBodySetVelocity( body, nvel );
+
+	cpShape *shape = cpCircleShapeNew( body, 1, cpvzero );
+	cpBodySetVelocityUpdateFunc( body, cpBodyUpdateVelocity_NoGravity );
+	cpSpaceAddShape( space, shape );
+	cpShapeSet_DEF( shape, 0.0001, 0.99, 0.001 );
+	cpShapeFilter filter = cpShapeFilterNew( 0, de_mask( "p" ), de_mask( "rsv" ) );
+	cpShapeSetFilter( shape, filter );
+	cpShapeSetCollisionType( shape, PARTICLE );
+	cpShapeSetUserData( shape, (cpDataPointer)O );
+
+	O->type = PARTICLE;
+	O->data = SDL_calloc( 1, sizeof(ageing_body) );
+	ageing_body* ab = (ageing_body*)(O->data);
+	ab->body = body;
+	ab->age = randomI( 20, 40 );
+	O->tick = ageing_body_tick;
+	O->destroy = destroy_ageing_body;
+}
 
 
 
@@ -777,6 +820,8 @@ void upon_a_sphere( SDL_Renderer *R, GameState *GS, char *spherepath ){
 	  cpCollisionHandler *bullet_rock_CH = cpSpaceAddCollisionHandler( space, BULLET, ROCK );
 	       bullet_rock_CH->postSolveFunc = sbod_down;
 
+	void **signal_queue = NULL;
+	cpSpaceSetUserData( space, (cpDataPointer)(&signal_queue) );
 
 
 	Transform T = { 0, 0, GS->cx, GS->cy, 1, 1, {0} };
@@ -813,7 +858,7 @@ void upon_a_sphere( SDL_Renderer *R, GameState *GS, char *spherepath ){
 	OBJ_Page *OBJS = SDL_malloc( sizeof(OBJ_Page) );
 	init_OBJ_Page( OBJS );
 
-	SDL_Surface *smosurf = SDL_LoadPNG( "Classic/wavies.png" );
+	SDL_Surface *smosurf = SDL_LoadPNG( "Classic/wavies 2.png" );
 	SDL_Texture *smokey_texture = SDL_CreateTextureFromSurface( R, smosurf );
 	SDL_DestroySurface( smosurf );
 
@@ -958,7 +1003,7 @@ void upon_a_sphere( SDL_Renderer *R, GameState *GS, char *spherepath ){
 			camera_matrix = update_TM_combined;
 		}
 		else if( camera == 'F' ){
-			update_camera = flat_world_update_camera;
+			update_camera = fixed_world_update_camera;
 			camera_matrix = update_TM_object_rotated;
 		}
 		destroy_world = destroy_round_world;
@@ -1096,7 +1141,7 @@ void upon_a_sphere( SDL_Renderer *R, GameState *GS, char *spherepath ){
 				double heading = cpBodyGetAngle( ships[0]->body ) - HALF_PI;
 				cpVect trig = cpvforangle( heading );
 				cpVect pos = cpvadd( p1pos, cpvmult( cpvrotate( cpv(1,0), trig ), circumship0.radius ) ); 
-				cpVect vel = cpvadd( cpBodyGetVelocity( ships[0]->body ), cpvmult( trig, 350 ) );
+				cpVect vel = cpvadd( cpBodyGetVelocity( ships[0]->body ), cpvmult( trig, 400 ) );
 				create_bullet( space, slot, pos, vel, heading, &bullet_style );
 			}
 		}
@@ -1184,6 +1229,30 @@ void upon_a_sphere( SDL_Renderer *R, GameState *GS, char *spherepath ){
 		}
 		T.M = WT;// reset for next step
 
+
+		// -- Handle signals generated in the callbacks --
+		int lsig = vec_size( signal_queue )-1;
+		for (int i = lsig; i >= 0; i-- ){
+			
+			int *type = (int*)(signal_queue[i]);
+
+			if( *type == BULLET ){
+				bullet_impact *bimp = (bullet_impact*)(signal_queue[i]);
+				int n = 3+SDL_rand(3);
+				for (int i = 0; i < n; ++i ){
+					OBJ *slot = fresh_OBJ_slot( OBJS );
+					create_particle( space, slot, bimp->pos, cpvneg(bimp->imp) );
+				}
+				for (int i = 0; i < 3; ++i ){
+					OBJ *slot = fresh_OBJ_slot( OBJS );
+					create_smokepuff( space, slot, puffscale, bimp->pos, cpv(0,-64) );
+				}
+			}
+			SDL_free( signal_queue[i] );
+			vec_pop( signal_queue );
+		}
+
+
 		// -- Objects tick -- 
 		OBJ_Page *OP = OBJS;
 		do{
@@ -1210,28 +1279,30 @@ void upon_a_sphere( SDL_Renderer *R, GameState *GS, char *spherepath ){
 
 		// -- HP bar ---
 		SDL_SetRenderDrawColor( R, 40, 255, 40, 255 );
-		SDL_RenderRect( R, &(SDL_FRect){ 10, 60, 200, 30 } );
+		SDL_RenderRect( R, &(SDL_FRect){ 20, 20, 200, 30 } );
 		float hull_w = cmap(ships[0]->hull, 0, ships[0]->data->hull_max, 0, 190);
-		SDL_RenderFillRect( R, &(SDL_FRect){ 15, 65, hull_w, 20 } );
+		SDL_RenderFillRect( R, &(SDL_FRect){ 25, 25, hull_w, 20 } );
 
 		
 
-		SDL_SetRenderDrawColor( R, 100, 255, 240, 255 );
+		SDL_SetRenderDrawColor( R, 582, 255, 240, 255 );
 		SDL_framerate_limit_n_monitor( R, 17 );
-		char buf [256];
+		
+		/*char buf [256];
 		SDL_snprintf( buf, sizeof(buf), "%lg, %lg", xy(p1pos) );
-	    SDL_RenderDebugText(R, 20, 40, buf);
+	    SDL_RenderDebugText(R, 500, 40, buf);
+		*/
 
 		SDL_RenderPresent(R);
 		
 	}//%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 	end:
 
+	destroy_world( world_data );
+
 	destroy_OBJ_Book( OBJS, space );
 
 	cpSpaceFree(space);
-
-	destroy_world( world_data );
 
 	int vss = vec_size( visual_styles );
 	for (int i = 0; i < vss; ++i ){

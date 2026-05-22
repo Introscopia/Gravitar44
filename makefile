@@ -2,7 +2,7 @@ CC = gcc
 
 OBJS = basics.c
 OBJS += Chipmunk/chipmunk.c Chipmunk/cpArbiter.c Chipmunk/cpArray.c Chipmunk/cpBBTree.c Chipmunk/cpBody.c Chipmunk/cpCollision.c Chipmunk/cpConstraint.c Chipmunk/cpDampedRotarySpring.c Chipmunk/cpDampedSpring.c Chipmunk/cpGearJoint.c Chipmunk/cpGrooveJoint.c Chipmunk/cpHashSet.c Chipmunk/cpHastySpace.c Chipmunk/cpMarch.c Chipmunk/cpPinJoint.c Chipmunk/cpPivotJoint.c Chipmunk/cpPolyline.c Chipmunk/cpPolyShape.c Chipmunk/cpRatchetJoint.c Chipmunk/cpRobust.c Chipmunk/cpRotaryLimitJoint.c Chipmunk/cpShape.c Chipmunk/cpSimpleMotor.c Chipmunk/cpSlideJoint.c Chipmunk/cpSpace.c Chipmunk/cpSpaceComponent.c Chipmunk/cpSpaceDebug.c Chipmunk/cpSpaceHash.c Chipmunk/cpSpaceQuery.c Chipmunk/cpSpaceStep.c Chipmunk/cpSpatialIndex.c Chipmunk/cpSweep1D.c
-OBJS += cvec.c vec2d.c primitives.c transform.c geometry.c svg.c input.c ciol.c game.c Grav44.c
+OBJS += cvec.c vec2d.c primitives.c transform.c Vector_Font.c geometry.c svg.c input.c ciol.c game.c Grav44.c
 
 # -w (suppresses all warnings)
 # -Wl,-subsystem (windows gets rid of the console window)
@@ -21,15 +21,17 @@ endif
 ifeq ($(DETECTED_OS),Windows)
 	INCLUDE_PATHS = -IC:/SDL/SDL3-3.4.0/x86_64-w64-mingw32/include/SDL3
 	INCLUDE_PATHS += -IC:/SDL/SDL3-3.4.0/x86_64-w64-mingw32/include/
+	#INCLUDE_PATHS += -IC:/SDL/SDL3_image-3.4.4/x86_64-w64-mingw32/include/SDL3_image
 	#INCLUDE_PATHS += -IClipper2
 
 	LIBRARY_PATHS = -LC:/SDL/SDL3-3.4.0/x86_64-w64-mingw32/lib
+	#LIBRARY_PATHS += -LC:/SDL/SDL3_image-3.4.4/x86_64-w64-mingw32/lib
 	#LIBRARY_PATHS += -LClipper2
 
-	LINKER_FLAGS = -lSDL3 #-Llib -l:libClipper2.a
+	LINKER_FLAGS = -lSDL3 #-lSDL3_image #-Llib -l:libClipper2.a
 else
 	INCLUDE_PATHS = -I/usr/include/SDL3
-	LINKER_FLAGS = -lSDL3
+	LINKER_FLAGS = -lSDL3 #-lSDL3_image 
 endif
 
 OBJ_NAME = Gravitar44

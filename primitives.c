@@ -101,7 +101,16 @@ void gp_draw_bezier2( SDL_Renderer *R, vec2d *a1, vec2d *a2, vec2d *c1, vec2d *c
 
 
 
-
+void gp_fill_diamond(SDL_Renderer *R, float x, float y, float radius){
+		SDL_FColor C = SDL_GetRender_SDL_FColor( R );
+		SDL_Vertex verts[4];
+		verts[0] = (SDL_Vertex){ { x + radius, y          }, C, {0} };
+		verts[1] = (SDL_Vertex){ { x         , y + radius }, C, {0} };
+		verts[2] = (SDL_Vertex){ { x - radius, y          }, C, {0} };
+		verts[3] = (SDL_Vertex){ { x         , y - radius }, C, {0} };
+		int indices[6] = { 0, 1, 2, 0, 2, 3 };
+		SDL_RenderGeometry( R, NULL, verts, 4, indices, 6 );
+}
 
 //https://gist.github.com/Gumichan01/332c26f6197a432db91cc4327fcabb1c
 void gp_draw_circle(SDL_Renderer *R, float x, float y, float radius){
