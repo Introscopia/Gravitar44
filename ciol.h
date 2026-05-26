@@ -21,9 +21,9 @@ cpVect cpv_rottrig( cpVect v, vec2d trig );
 	b - bullets
 	c - 
 	d - 
-	e - Exhaust, effects
+	e - 
 	f - 
-	g - 
+	g - gas (smoke)
 	h - 
 	i - 
 	j - 
@@ -32,17 +32,17 @@ cpVect cpv_rottrig( cpVect v, vec2d trig );
 	m - 
 	n - 
 	o - 
-	p - particles
+	p - Particles
 	q - 
 	r - rock
-	s - Solid, static
+	s - Shields
 	t - 
 	u - 
 	v - Vessels
 	w - 
 	x - 
 	y - 
-	z - 
+	z -
 	A - 
 	B - 
 	C - 

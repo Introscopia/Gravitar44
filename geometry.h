@@ -78,7 +78,7 @@ int line_sect(vec2d x0, vec2d x1, vec2d y0, vec2d y1, vec2d *res);
 
 void geo_offset(Geometric *geo, vec2d offset);
 
-SDL_Rect geo_bb(Geometric *geo);
+SDL_FRect geo_bb(Geometric *geo);
 
 Path SDL_FRect_to_Path( SDL_FRect *rect );
 

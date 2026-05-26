@@ -311,7 +311,7 @@ int SVG_layer_into_cpSpace( SVG_Layer *layer, cpSpace *space, bool physical_stro
 
 		cpShapeSetCollisionType( shape, pr.collisionType );
 		if( pr.categories == CP_ALL_CATEGORIES ){
-			if( pr.behavior == 's' ) pr.categories = de_mask( "st" );
+			if( pr.behavior == 's' ) pr.categories = de_mask( "r" );
 		}
 		cpShapeFilter filter = cpShapeFilterNew( pr.group, pr.categories, pr.mask );
 		cpShapeSetFilter( shape, filter );
@@ -779,3 +779,64 @@ void stroke_cpSpace( SDL_Renderer *R, cpSpace *space, Transform *T ){
 	}
 	}
 */
+
+
+
+/* SONAR
+
+	cpVect sonar_beams [6];
+	for (int i = 0; i < 6; ++i ){
+		sonar_beams[i] = cpvp( 10000.0, SIXTH_PI + (i * THIRD_PI) );
+	}
+	cpShapeFilter sonar_filter = cpShapeFilterNew( 0, de_mask( "z" ), de_mask( "r" ) );
+	#define SHL 24
+	double sonar_history [SHL];
+	for (int i = 0; i < SHL; ++i ){
+		sonar_history[i] = -1;
+	}
+	int sonar_hi = 0;
+
+
+	// -- Sonar (autozoom) --
+		double nearest_rock = 999999999;
+		cpVect sonar_centroid = cpvzero;
+		int sonar_hits = 0;
+		for (int i = 0; i < 6; ++i ){
+			cpSegmentQueryInfo segInfo = {0};
+			cpVect end = cpvadd( p1pos, sonar_beams[i] );
+			if( cpSpaceSegmentQueryFirst( space, p1pos, end, 0, sonar_filter, &segInfo) ) {
+				double d = cpvdistsq( p1pos, segInfo.point );
+				if( d < nearest_rock ) nearest_rock = d;
+				sonar_centroid = cpvadd( sonar_centroid, segInfo.point );
+				sonar_hits++;
+				    //SDL_SetRenderDrawColor( R, 255, 0, 255, 255 );
+					//TM_APPLY_TO( point, point, T.M );
+					//gp_fill_8circle( R, point.x, point.y, 4 );
+			}
+		}
+		int pshi = sonar_hi;
+		sonar_history[ sonar_hi++ ] = SDL_sqrt(nearest_rock);
+		if( sonar_hi >= SHL ) sonar_hi = 0;
+		nearest_rock = 0;
+		for (int i = 0; i < SHL; ++i ){
+			if( sonar_history[i] < 0 ) continue;
+			nearest_rock += sonar_history[i];
+		}
+		nearest_rock /= SHL;
+		double target_zoom = map( 5 * nearest_rock, 0, 3.5 * bounds_rct.h, 40*circumship0.radius, bounds_rct.h );
+		target_zoom = GS->window_rct.h / target_zoom;
+		double zoom_speed = 0.005;
+		if( target_zoom < T.s ){
+			zoom_speed = 0.8 * ((T.s * sonar_history[ pshi ]) / (GS->window_rct.h * 0.5));
+		}
+		set_scale( &T, lerp( T.s, target_zoom, zoom_speed ) );
+		
+
+		// also move camera target towards sonar centroid... (it stinks)
+		sonar_centroid = cpvmult( sonar_centroid, 1.0 / sonar_hits );
+		cpVect cam_target_target = cpvlerp( p1pos, sonar_centroid, 0.333 );
+		cam_target = cpvslerp( cam_target, cam_target_target, 0.12 );
+		TM_APPLY_TO( sonar_centroid, sonar_centroid, T.M );
+		SDL_SetRenderDrawColor( R, 255, 126, 200, 255 );
+		gp_fill_8circle( R, xy(sonar_centroid), 8 );
+	*/

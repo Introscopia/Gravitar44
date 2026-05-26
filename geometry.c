@@ -172,8 +172,9 @@ void geo_offset(Geometric *geo, vec2d offset) {
 	}
 }
 
-SDL_Rect geo_bb(Geometric *geo) {
-    if (!geo) return (SDL_Rect){0, 0, 0, 0};
+SDL_FRect geo_bb(Geometric *geo) {
+
+    if( geo == NULL ) return (SDL_FRect){0, 0, 0, 0};
 
     double min_x = 9999999, min_y = 9999999, max_x = -9999999, max_y = -9999999;
     int first = 1;
@@ -181,7 +182,7 @@ SDL_Rect geo_bb(Geometric *geo) {
     switch (geo->type) {
         case geo_PATH: {
             Path *p = &geo->u.path;
-            if (p->N == 0) return (SDL_Rect){0, 0, 0, 0};
+            if (p->N == 0) return (SDL_FRect){0, 0, 0, 0};
             min_x = max_x = p->verts[0].x;
             min_y = max_y = p->verts[0].y;
             for (int i = 1; i < p->N; ++i) {
@@ -214,15 +215,14 @@ SDL_Rect geo_bb(Geometric *geo) {
         }
 
         default:
-            return (SDL_Rect){0, 0, 0, 0};
+            return (SDL_FRect){0, 0, 0, 0};
     }
 
-    SDL_Rect rct;
-    rct.x = (int)SDL_floor(min_x);
-    rct.y = (int)SDL_floor(min_y);
-    rct.w = (int)SDL_ceil(max_x) - rct.x;
-    rct.h = (int)SDL_ceil(max_y) - rct.y;
-    return rct;
+    SDL_FRect bb = (SDL_FRect){ min_x,
+								min_y,
+								max_x - min_x,
+								max_y - min_y };
+    return bb;
 }
 
 
@@ -315,7 +315,7 @@ vec2d random_point_in_geo(Geometric *geo) {
 
         case geo_PATH: {
             const Path *p = &geo->u.path;
-            SDL_Rect bb = geo_bb(geo);
+            SDL_FRect bb = geo_bb(geo);
 
             const int MAX_ATTEMPTS = 24;
             int a;

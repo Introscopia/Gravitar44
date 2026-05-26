@@ -570,7 +570,10 @@
      inkscape:groupmode="layer"
      id="layer2"
      inkscape:label="Visual"
-     style="display:inline">
+     style="display:inline"
+     zoom_top="0.8"
+     zoom_bottom="0.25"
+     camera="FIXED">
     <path
        style="fill:none;fill-opacity:0.129032;stroke:#00ff00;stroke-linejoin:round;stroke-opacity:1;paint-order:markers fill stroke"
        d="m -281.73314,-597.93857 127.99994,128 224.000117,-4e-5 128.000003,-128 -128.000003,-128 h -96 l 255.000003,-128 159.99988,384.00035 96.00009,-7e-5 96.00007,95.99975 h 160 l -64,64 160.00018,159.99995 h 32 l 127.99993,127.999995 -63.99993,64 -192.00004,-3.8e-5 -64,64.000003 64,64 -96,128 96,96 -64,64 h -128 l -160,160 h 96 l -96,96 -160,-160 255,-255 H -25.732959 l -96.000371,-96.99986 h -159.99995 l -127.99998,128 127.99998,128 -159.99998,160 -160,2e-5 160,-160.00003 -160,-160 -96,64 -95.99994,-96.00003 h -160 l 160,-160 h -128 l -128,-128.000003 h 192 l 256,-255.999997 h 64 l 128,-128.00006 128,-1e-5 -96,-96 z"
@@ -586,8 +589,7 @@
        id="bounds"
        cy="0"
        cx="0"
-       r="1665"
-       camera="FIXED" />
+       r="1665" />
     <circle
        style="fill:#9c9c9c;fill-opacity:0.316854;stroke:none;stroke-linejoin:round;stroke-opacity:1;paint-order:markers fill stroke"
        id="gravity_falloff"

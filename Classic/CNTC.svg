@@ -898,7 +898,9 @@
      id="layer2"
      inkscape:label="Visual"
      sodipodi:insensitive="true"
-     style="display:none">
+     style="display:none"
+     zoom_top="1.25"
+     zoom_bottom="0.3">
     <path
        style="fill:none;fill-opacity:0.189964;stroke:#00ff00;stroke-linejoin:round;stroke-opacity:1;paint-order:markers fill stroke"
        d="m -1,-608 h 128 l 64,160 64,-160 h 127 l 64,96 64,-96 h 512 l -64,-64 H -1"

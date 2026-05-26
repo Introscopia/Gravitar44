@@ -203,7 +203,9 @@
    id="layer2"
    inkscape:label="Visual"
    style="display:inline"
-   sodipodi:insensitive="true">
+   sodipodi:insensitive="true"
+   zoom_top="1.25"
+   zoom_bottom="0.4">
      <path
    style="fill:none;stroke:#00ff00;stroke-width:2;stroke-dasharray:none;stroke-opacity:1;paint-order:markers fill stroke"
    d="m 0,200.5 h 255 l 255,256 h 255 l 255,-256 h 510 l 510,512 h 255 l 255,-255 255,-1 255,-256 255,256 h 255 l 255,-255 255,-1"

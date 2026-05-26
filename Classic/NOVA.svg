@@ -461,8 +461,7 @@
        id="bounds"
        cx="0"
        cy="0"
-       r="1674.5763"
-       camera="FIXED" />
+       r="1674.5763" />
     <circle
        style="fill:#9c9c9c;fill-opacity:0.316854;stroke:#00ff00;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:0.473118;paint-order:markers fill stroke"
        id="spawn"
@@ -474,7 +473,10 @@
      inkscape:groupmode="layer"
      id="layer3"
      inkscape:label="Visual"
-     style="display:inline">
+     style="display:inline"
+     zoom_top="0.7"
+     zoom_bottom="0.45"
+     camera="FIXED">
     <path
        style="font-style:normal;font-weight:normal;font-size:12px;font-family:Dialog;color-interpolation:auto;fill:none;fill-opacity:0.316854;stroke:#00ff00;stroke-width:1;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:10;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;paint-order:markers fill stroke;color-rendering:auto;image-rendering:auto;shape-rendering:auto;text-rendering:auto"
        d="m -894.87467,-1134.9068 382.99997,383.00005 -765,764.999991 765,765.000009 H 508.12533 L 1273.1253,13.093241 635.12533,-624.90675 H -2.8746876 l -254.9999924,255 509.99998,509.99999 h 383.00003 l 128,-127.999999 -255,-254.999991 H 253.1253 l -127.99998,-128 h 383.00001 l 383,382.999991 L 380.1253,523.09325 h -756 L -886.87467,10.093241 261.1253,-1137.9068"

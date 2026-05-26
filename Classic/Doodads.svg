@@ -89,7 +89,7 @@
        friction="0.06"
        hull_max="100"
        thrust="200000"
-       turn_speed="260"
+       turn_speed="275"
        fuel_max="8000"
        fuel_consumption="0.25">
       <path

@@ -12,6 +12,8 @@
 -- EXTRAS --
 Homebase, get fixed up, get fuel
 Steal the reactor from NOVA, bring it back to homebase
+Alternate weapons: a "stun" or "ion" thing that disables the target (including thrusters! hihihi)
+Damage modifiers: limping or stuttering thrusters. Fuel leaking. gun jammed.
 
 */
 #include <SDL.h>
@@ -178,7 +180,7 @@ int main(int argc, char *argv[]){
 		// SPIN MODE
 		else if( title_mode == 2 ){
 			VCT_project_string_on_a_Ball( &titlestr_3D, &titlestr_consolidated, fch,
-									  rad, xhead, xarc, yhead, yarc, zoff );
+									      rad, xhead, xarc, yhead, yarc, zoff );
 			xhead += 0.004;
 			if( xhead > 2.5 * PI ){
 				title_mode = 1;
@@ -199,7 +201,7 @@ int main(int argc, char *argv[]){
 
 		SDL_SetRenderDrawColor( R, 220, 220, 220, 255 );
 		VCT_render_string_wrapped_aligned( R, &square_font, "- INTROSCOPIA * 2026 -", 
-			                               0, height-(2*sfch), width, VCT_ALIGN_CENTER );
+			                               0, (0.86 * height)-(0.5 * sfch), width, VCT_ALIGN_CENTER );
 
 		//VCT_render_string_wrapped_aligned( R, &grav_font, titlestr, 0, cy+200, width, VCT_ALIGN_CENTER );
 
