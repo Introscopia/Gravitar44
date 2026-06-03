@@ -365,7 +365,8 @@ void pilot_THRUSTER( Ship_inst *S, vec2d pilot_vec, vec2d prev_pilot_vec, double
 
 
 
-void init_flat_world( void **W, SDL_FRect bounds, SDL_FRect goff, Styled_Geo *map_visuals, int width, 
+void init_flat_world( void **W, SDL_FRect bounds, SDL_FRect goff, Styled_Geo *map_visuals, 
+					  int width, int height,
 					  float zoom_top, float zoom_bottom,
 					  SDL_Texture *puff_mask, float puffscale, 
 					  world_bounding_func world_bounding ){
@@ -382,6 +383,7 @@ void init_flat_world( void **W, SDL_FRect bounds, SDL_FRect goff, Styled_Geo *ma
 	fw->chunks = SDL_calloc( fw->chunks_N, sizeof(int*) );
 	fw->chunk_w = bounds.w / fw->chunks_N;
 	fw->width = width;
+	fw->height = height;
 	fw->zoom_top = zoom_top;
 	fw->zoom_bottom = zoom_bottom;
 
@@ -438,32 +440,14 @@ void flat_world_update_camera( void *W, Transform *T, cpVect target,
 
 	T->tx = target.x;
 
-	set_scale( T, map( target.y, bounds.y, bounds.y + bounds.h, fw->zoom_top, fw->zoom_bottom ) );
-	//SDL_Log("T->s = %g = map( %lg, 0, %g, %g, %g )", T->s, target.y, bounds.h, fw->zoom_top, fw->zoom_bottom );
-	
-	float viewport_h = window_rct.h * T->invs;
-	if( viewport_h >= bounds.h - SDL_FLT_EPSILON ){
-		T->ty = bounds.y + (viewport_h * 0.5f);
-	}
-	else{
-		float half_vph = viewport_h * 0.499f;
-		float new_ty;
-		float boundlow =  bounds.y + (0.66 * bounds.h);
-    	if( target.y > boundlow ) new_ty = target.y;
-    	else{
-    		new_ty = map( target.y, bounds.y, boundlow, target.y + half_vph, target.y );
-    	}
-
-	    bool out_the_top = new_ty - half_vph < bounds.y;
-	    bool out_the_bottom = new_ty + half_vph > bounds.y + bounds.h;
-	    
-	    if( out_the_top && !out_the_bottom ){
-	        new_ty = bounds.y + half_vph;
-	    } else if( out_the_bottom && !out_the_top ){
-	        new_ty = bounds.y + bounds.h - half_vph;
-	    }
-	    T->ty = new_ty;
-	}
+	float below = bounds.y + bounds.h - target.y;
+	         // = map( target.y, 0, bounds.y + (0.66 * bounds.h), 0, 0.5 );
+	float above = 0.5 * ( (target.y - bounds.y) / (0.6 * bounds.h) );
+	if( above > 0.5 ) above = 0.5;
+	float viewport_h = below / (1.0 - above);
+	float ns = constrainF( fw->height / viewport_h, fw->zoom_top, fw->zoom_bottom );
+	set_scale( T, ns );
+	T->ty = map( above, 0, 0.5, target.y + (0.5 * viewport_h), target.y );
 
 	update_TM( T, 0, 0, 0, 0 );
 
@@ -607,7 +591,8 @@ void round_world_gravitate( void *W, cpBody *body, double force ){
 	double plsq = cpvlengthsq(p);
 	double pl = SDL_sqrt(plsq);
 	if( plsq > rw->surface_radsq ){
-		grav = cpvmult( cpvneg(p), force / ((plsq * pl) + CPFLOAT_MIN) );
+		grav = cpvmult( cpvneg(p), force / ((plsq * pl) + CPFLOAT_MIN) ); 
+		// = F / pl^3 because one of those pls is normalizing p.
 	} else {
 		grav = cpvmult( cpvneg(p), force / rw->surface_radcubed );
 	}
@@ -1006,7 +991,8 @@ void upon_a_sphere( SDL_Renderer *R, GameState *GS, char *spherepath ){
 
 	if( bounds.type == geo_BOX ){ // THE WORLD IS FLAT!
 		init_flat_world( &world_data, bounds_rct, gravity_falloff.u.box, 
-						 map_visuals, GS->window_rct.w, zoom_top, zoom_bottom,
+						 map_visuals, GS->window_rct.w, GS->window_rct.h, 
+						 zoom_top, zoom_bottom,
 						 puff_mask, puffscale, flat_world_bounding );
 		render_world = render_flat_world;
 		render_objects = render_wrapping_objects;

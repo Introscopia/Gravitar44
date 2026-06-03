@@ -1,5 +1,5 @@
 
-/* CHIPMUNK INTEROPERABILITY LAYER */
+/* INTROSCOPIA'S CHIPMUNK INTEROPERABILITY LAYER */
 
 #include "ciol.h"
 #include "Chipmunk/headers/chipmunk_structs.h"

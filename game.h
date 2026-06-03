@@ -122,7 +122,7 @@ typedef struct{
 	int chunks_N;
 	int **chunks;
 	float chunk_w;
-	int width;//window's
+	int width, height;//window's
 	float zoom_top;
 	float zoom_bottom;
 
